@@ -2,3 +2,45 @@
 # This is a simple post deploy hook executed after your application
 # is deployed and started.  This script gets executed directly, so 
 # it could be python, php, ruby, etc.
+
+set -e
+
+pushd ${OPENSHIFT_REPO_DIR} > /dev/null
+bundle exec rake generate_secret_token
+popd
+
+if [ -z $OPENSHIFT_DB_HOST ]; then
+    echo 1>&2
+    echo "Could not find mysql database. Please run:" 1>&2
+    echo "rhc app cartridge add -a $OPENSHIFT_APP_NAME -c mysql-5.1" 1>&2
+    echo "then make a sample commit (add whitespace somewhere) and re-push" 1>&2
+    echo 1>&2
+    exit 5
+fi
+
+# Confirm database exists, if not create it
+qry="select * from redmine.users;"
+if ! /usr/bin/mysql -h "$OPENSHIFT_DB_HOST" -u "$OPENSHIFT_DB_USERNAME"  \
+                    --password="$OPENSHIFT_DB_PASSWORD" "$OPENSHIFT_APP_NAME" \
+                    -e "$qry" > /dev/null 2>&1; then
+    echo
+    echo "Schema not found! Recreating redmine schema"
+    echo
+    /usr/bin/mysql -h "$OPENSHIFT_DB_HOST" -u "$OPENSHIFT_DB_USERNAME"  \
+          --password="$OPENSHIFT_DB_PASSWORD" "$OPENSHIFT_APP_NAME" <<MYEOF
+drop database if exists redmine;
+create database redmine character set utf8;
+MYEOF
+
+    # Run db:migrate
+    pushd ${OPENSHIFT_REPO_DIR} > /dev/null
+    bundle exec rake db:migrate RAILS_ENV=production 
+    bundle exec rake redmine:load_default_data RAILS_ENV=production  \
+                                               REDMINE_LANG='en'
+    popd > /dev/null
+    echo
+    echo "done."
+else
+    echo "Database found, skipping import."
+fi
+

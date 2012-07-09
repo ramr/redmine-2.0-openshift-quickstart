@@ -3,3 +3,33 @@
 # available.  Otherwise it will execute while your application is stopped
 # before the build step.  This script gets executed directly, so it
 # could be python, php, ruby, etc.
+
+
+function get_ruby_version() {
+  #  Use GEAR_TYPE if we have it.
+  [ -n "$OPENSHIFT_GEAR_TYPE" ]  &&  echo "$OPENSHIFT_GEAR_TYPE"  &&  return 0
+
+  #  Check existence of ruby-1.9 directory.
+  if [ -d "$OPENSHIFT_HOMEDIR/ruby-1.9" ]; then
+     echo "ruby-1.9"
+     return 0
+  fi
+
+  echo "ruby-1.8"
+}
+
+
+#
+#  main(): Add a Gemfile.lock from the specific version and replace the env
+#          variables for DB HOST, USERNAME and PASSWORD.
+# 
+pushd "$OPENSHIFT_REPO_DIR" > /dev/null
+[ ! -f Gemfile.lock ] && cp -f "Gemfile.lock.$(get_ruby_version)" Gemfile.lock
+
+if [ -f config/database.yml ]; then
+   sed -i "s#\$OPENSHIFT_DB_HOST#$OPENSHIFT_DB_HOST#;          \
+           s#\$OPENSHIFT_DB_USERNAME#$OPENSHIFT_DB_USERNAME#;  \
+           s#\$OPENSHIFT_DB_PASSWORD#$OPENSHIFT_DB_PASSWORD#"  \
+          config/database.yml
+fi
+popd > /dev/null
