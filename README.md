@@ -41,3 +41,11 @@ Use the following to login to your new Redmine application running on OpenShift:
 	username: admin
 	password: admin
 
+
+Changing the default admin password
+-----------------------------------
+Once your installation is complete, it is highly recommended that you change
+the password for the Redmine admin user - see the Change password link at:
+
+	http://redmine-$yournamespace.rhcloud.com/my/account
+
