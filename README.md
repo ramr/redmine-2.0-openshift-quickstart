@@ -30,7 +30,7 @@ Add this upstream Redmine quickstart repo
 In order to be able to upload files attached to issues, you should add a
 "files" directory/folder
 
-	mkdir file
+	mkdir files
 
 and remove the line /files/* from .gitignore to push that directory/folder
 to all the gears (where your OpenShift application is running).
