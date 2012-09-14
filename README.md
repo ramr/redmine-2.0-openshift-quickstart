@@ -27,11 +27,17 @@ Add this upstream Redmine quickstart repo
 	git remote add upstream -m master git://github.com/openshift/redmine-2.0-openshift-quickstart.git
 	git pull -s recursive -X theirs upstream master
 
-In order to be able to upload files attached to issues you shold add "files" folder
-	mkdir file
-and remove line /files/* from .gitignore to push folder on server.
+In order to be able to upload files attached to issues, you should add a
+"files" directory/folder
 
-Alternatively you can ssh to server and create a folder "files" under redmine/repo
+	mkdir file
+
+and remove the line /files/* from .gitignore to push that directory/folder
+to all the gears (where your OpenShift application is running).
+
+Alternatively, you can ssh to all the serving gears for your application
+and create a directory/folder called "files" under redmine/repo
+
 	mkdir redmine/repo/files
 
 Then push the repo upstream
