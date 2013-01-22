@@ -17,7 +17,7 @@ Create a ruby application (ruby-1.8 or ruby-1.9)
 
 Add mysql support to your application
     
-	rhc app cartridge add -a redmine -c mysql-5.1
+	rhc cartridge add -a redmine -c mysql-5.1
 
 Make a note of the username, password, and host name as you will need to use these to login to the mysql database
 
