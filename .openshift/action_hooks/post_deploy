@@ -7,7 +7,7 @@ set -e
 
 pushd ${OPENSHIFT_REPO_DIR} > /dev/null
 bundle exec rake generate_secret_token
-popd
+popd > /dev/null
 
 if [ -z $OPENSHIFT_MYSQL_DB_HOST ]; then
     echo 1>&2
@@ -37,9 +37,8 @@ MYEOF
 
     # Run db:migrate
     pushd ${OPENSHIFT_REPO_DIR} > /dev/null
-    bundle exec rake db:migrate RAILS_ENV=production 
-    bundle exec rake redmine:load_default_data RAILS_ENV=production  \
-                                               REDMINE_LANG='en'
+    bundle exec "env RAILS_ENV='production' rake db:migrate"
+    bundle exec "env RAILS_ENV='production' REDMINE_LANG='en' rake redmine:load_default_data"
     popd > /dev/null
     echo
     echo "done."

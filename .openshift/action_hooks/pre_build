@@ -4,29 +4,11 @@
 # before the build step.  This script gets executed directly, so it
 # could be python, php, ruby, etc.
 
-
-function get_ruby_version() {
-  #  Check existence of ruby-1.9 directory.
-  if [ -d "$OPENSHIFT_HOMEDIR/ruby-1.9" ]; then
-     echo "ruby-1.9"
-     return 0
-  fi
-
-  echo "ruby-1.8"
-}
-
-
 #
 #  main(): Add a Gemfile.lock from the specific version and replace the env
 #          variables for DB HOST, USERNAME and PASSWORD.
 # 
 pushd "$OPENSHIFT_REPO_DIR" > /dev/null
-[ ! -f Gemfile.lock ] && cp -f "Gemfile.lock.$(get_ruby_version)" Gemfile.lock
-
-if [ -f config/database.yml ]; then
-   sed -i "s#\$OPENSHIFT_MYSQL_DB_HOST#$OPENSHIFT_MYSQL_DB_HOST#;          \
-           s#\$OPENSHIFT_MYSQL_DB_USERNAME#$OPENSHIFT_MYSQL_DB_USERNAME#;  \
-           s#\$OPENSHIFT_MYSQL_DB_PASSWORD#$OPENSHIFT_MYSQL_DB_PASSWORD#"  \
-          config/database.yml
-fi
+[ ! -f Gemfile.lock ] && cp -f "Gemfile.lock.ruby-$OPENSHIFT_RUBY_VERSION" Gemfile.lock
+cp config/database.yml-$OPENSHIFT_RUBY_VERSION config/database.yml
 popd > /dev/null
