@@ -21,6 +21,7 @@ fi
 # Confirm database exists, if not create it
 qry="select * from redmine.users;"
 if ! mysql -h "$OPENSHIFT_MYSQL_DB_HOST"              \
+                    -P "$OPENSHIFTMYSQL_DB_PORT"    \
                     -u "$OPENSHIFT_MYSQL_DB_USERNAME"          \
                     --password="$OPENSHIFT_MYSQL_DB_PASSWORD"  \
                     "$OPENSHIFT_APP_NAME" -e "$qry" > /dev/null 2>&1; then
