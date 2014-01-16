@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -29,7 +29,7 @@ class ProjectEnumerationsController < ApplicationController
       flash[:notice] = l(:notice_successful_update)
     end
 
-    redirect_to :controller => 'projects', :action => 'settings', :tab => 'activities', :id => @project
+    redirect_to settings_project_path(@project, :tab => 'activities')
   end
 
   def destroy
@@ -37,7 +37,6 @@ class ProjectEnumerationsController < ApplicationController
       time_entry_activity.destroy(time_entry_activity.parent)
     end
     flash[:notice] = l(:notice_successful_update)
-    redirect_to :controller => 'projects', :action => 'settings', :tab => 'activities', :id => @project
+    redirect_to settings_project_path(@project, :tab => 'activities')
   end
-
 end

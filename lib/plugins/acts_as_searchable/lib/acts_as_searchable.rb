@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -72,14 +72,8 @@ module Redmine
             tokens = [] << tokens unless tokens.is_a?(Array)
             projects = [] << projects unless projects.nil? || projects.is_a?(Array)
 
-            find_options = {:include => searchable_options[:include]}
-            find_options[:order] = "#{searchable_options[:order_column]} " + (options[:before] ? 'DESC' : 'ASC')
-
             limit_options = {}
             limit_options[:limit] = options[:limit] if options[:limit]
-            if options[:offset]
-              limit_options[:conditions] = "(#{searchable_options[:date_column]} " + (options[:before] ? '<' : '>') + "'#{connection.quoted_date(options[:offset])}')"
-            end
 
             columns = searchable_options[:columns]
             columns = columns[0..0] if options[:titles_only]
@@ -87,23 +81,21 @@ module Redmine
             token_clauses = columns.collect {|column| "(LOWER(#{column}) LIKE ?)"}
 
             if !options[:titles_only] && searchable_options[:search_custom_fields]
-              searchable_custom_field_ids = CustomField.find(:all,
-                                                             :select => 'id',
-                                                             :conditions => { :type => "#{self.name}CustomField",
-                                                                              :searchable => true }).collect(&:id)
-              if searchable_custom_field_ids.any?
-                custom_field_sql = "#{table_name}.id IN (SELECT customized_id FROM #{CustomValue.table_name}" +
+              searchable_custom_fields = CustomField.where(:type => "#{self.name}CustomField", :searchable => true)
+              searchable_custom_fields.each do |field|
+                sql = "#{table_name}.id IN (SELECT customized_id FROM #{CustomValue.table_name}" +
                   " WHERE customized_type='#{self.name}' AND customized_id=#{table_name}.id AND LOWER(value) LIKE ?" +
-                  " AND #{CustomValue.table_name}.custom_field_id IN (#{searchable_custom_field_ids.join(',')}))"
-                token_clauses << custom_field_sql
+                  " AND #{CustomValue.table_name}.custom_field_id = #{field.id})" +
+                  " AND #{field.visibility_by_project_condition(searchable_options[:project_key], user)}"
+                token_clauses << sql
               end
             end
 
             sql = (['(' + token_clauses.join(' OR ') + ')'] * tokens.size).join(options[:all_words] ? ' AND ' : ' OR ')
 
-            find_options[:conditions] = [sql, * (tokens.collect {|w| "%#{w.downcase}%"} * token_clauses.size).sort]
+            tokens_conditions = [sql, * (tokens.collect {|w| "%#{w.downcase}%"} * token_clauses.size).sort]
 
-            scope = self
+            scope = self.scoped
             project_conditions = []
             if searchable_options.has_key?(:permission)
               project_conditions << Project.allowed_to_condition(user, searchable_options[:permission] || :view_project)
@@ -120,9 +112,19 @@ module Redmine
             results = []
             results_count = 0
 
-            scope = scope.scoped({:conditions => project_conditions}).scoped(find_options)
-            results_count = scope.count(:all)
-            results = scope.find(:all, limit_options)
+            scope = scope.
+              includes(searchable_options[:include]).
+              order("#{searchable_options[:order_column]} " + (options[:before] ? 'DESC' : 'ASC')).
+              where(project_conditions).
+              where(tokens_conditions)
+
+            results_count = scope.count
+
+            scope_with_limit = scope.limit(options[:limit])
+            if options[:offset]
+              scope_with_limit = scope_with_limit.where("#{searchable_options[:date_column]} #{options[:before] ? '<' : '>'} ?", options[:offset])
+            end
+            results = scope_with_limit.all
 
             [results, results_count]
           end

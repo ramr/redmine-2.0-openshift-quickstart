@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,8 +18,17 @@
 require File.expand_path('../../../../../test_helper', __FILE__)
 
 class Redmine::MenuManager::MapperTest < ActiveSupport::TestCase
-  context "Mapper#initialize" do
-    should "be tested"
+  test "Mapper#initialize should define a root MenuNode if menu is not present in items" do
+    menu_mapper = Redmine::MenuManager::Mapper.new(:test_menu, {})
+    node = menu_mapper.menu_items
+    assert_not_nil node
+    assert_equal :root, node.name
+  end
+
+  test "Mapper#initialize should use existing MenuNode if present" do
+    node = "foo" # just an arbitrary reference
+    menu_mapper = Redmine::MenuManager::Mapper.new(:test_menu, {:test_menu => node})
+    assert_equal node, menu_mapper.menu_items
   end
 
   def test_push_onto_root

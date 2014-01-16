@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@
 require 'SVG/Graph/Bar'
 require 'SVG/Graph/BarHorizontal'
 require 'digest/sha1'
-require 'redmine/scm/adapters/abstract_adapter'
+require 'redmine/scm/adapters'
 
 class ChangesetNotFound < Exception; end
 class InvalidRevisionParam < Exception; end
@@ -42,12 +42,12 @@ class RepositoriesController < ApplicationController
     @repository = Repository.factory(scm)
     @repository.is_default = @project.repository.nil?
     @repository.project = @project
-    render :layout => !request.xhr?
   end
 
   def create
     attrs = pickup_extra_info
-    @repository = Repository.factory(params[:repository_scm], attrs[:attrs])
+    @repository = Repository.factory(params[:repository_scm])
+    @repository.safe_attributes = params[:repository]
     if attrs[:attrs_extra].keys.any?
       @repository.merge_extra_info(attrs[:attrs_extra])
     end
@@ -64,7 +64,7 @@ class RepositoriesController < ApplicationController
 
   def update
     attrs = pickup_extra_info
-    @repository.attributes = attrs[:attrs]
+    @repository.safe_attributes = attrs[:attrs]
     if attrs[:attrs_extra].keys.any?
       @repository.merge_extra_info(attrs[:attrs_extra])
     end
@@ -111,7 +111,7 @@ class RepositoriesController < ApplicationController
   end
 
   def show
-    @repository.fetch_changesets if Setting.autofetch_changesets? && @path.empty?
+    @repository.fetch_changesets if @project.active? && Setting.autofetch_changesets? && @path.empty?
 
     @entries = @repository.entries(@path, @rev)
     @changeset = @repository.find_changeset_by_name(@rev)
@@ -138,13 +138,14 @@ class RepositoriesController < ApplicationController
 
   def revisions
     @changeset_count = @repository.changesets.count
-    @changeset_pages = Paginator.new self, @changeset_count,
+    @changeset_pages = Paginator.new @changeset_count,
                                      per_page_option,
                                      params['page']
-    @changesets = @repository.changesets.find(:all,
-                       :limit  =>  @changeset_pages.items_per_page,
-                       :offset =>  @changeset_pages.current.offset,
-                       :include => [:user, :repository, :parents])
+    @changesets = @repository.changesets.
+      limit(@changeset_pages.per_page).
+      offset(@changeset_pages.offset).
+      includes(:user, :repository, :parents).
+      all
 
     respond_to do |format|
       format.html { render :layout => false if request.xhr? }
@@ -176,6 +177,7 @@ class RepositoriesController < ApplicationController
       send_opt = { :filename => filename_for_content_disposition(@path.split('/').last) }
       send_type = Redmine::MimeType.of(@path)
       send_opt[:type] = send_type.to_s if send_type
+      send_opt[:disposition] = (Redmine::MimeType.is_type?('image', @path) && !is_raw ? 'inline' : 'attachment')
       send_data @content, send_opt
     else
       # Prevent empty lines when displaying a file with Windows style eol
@@ -227,29 +229,14 @@ class RepositoriesController < ApplicationController
   # Adds a related issue to a changeset
   # POST /projects/:project_id/repository/(:repository_id/)revisions/:rev/issues
   def add_related_issue
-    @issue = @changeset.find_referenced_issue_by_id(params[:issue_id])
+    issue_id = params[:issue_id].to_s.sub(/^#/,'')
+    @issue = @changeset.find_referenced_issue_by_id(issue_id)
     if @issue && (!@issue.visible? || @changeset.issues.include?(@issue))
       @issue = nil
     end
 
     if @issue
       @changeset.issues << @issue
-      respond_to do |format|
-        format.js {
-          render :update do |page|
-            page.replace_html "related-issues", :partial => "related_issues"
-            page.visual_effect :highlight, "related-issue-#{@issue.id}"
-          end
-        }
-      end
-    else
-      respond_to do |format|
-        format.js {
-          render :update do |page|
-            page.alert(l(:label_issue) + ' ' + l('activerecord.errors.messages.invalid'))
-          end
-        }
-      end
     end
   end
 
@@ -257,16 +244,8 @@ class RepositoriesController < ApplicationController
   # DELETE /projects/:project_id/repository/(:repository_id/)revisions/:rev/issues/:issue_id
   def remove_related_issue
     @issue = Issue.visible.find_by_id(params[:issue_id])
-    if @issue 
+    if @issue
       @changeset.issues.delete(@issue)
-    end
-
-    respond_to do |format|
-      format.js {
-        render :update do |page|
-          page.remove "related-issue-#{@issue.id}"
-        end if @issue
-      }
     end
   end
 
@@ -374,15 +353,18 @@ class RepositoriesController < ApplicationController
     @date_to = Date.today
     @date_from = @date_to << 11
     @date_from = Date.civil(@date_from.year, @date_from.month, 1)
-    commits_by_day = Changeset.count(
-                          :all, :group => :commit_date,
-                          :conditions => ["repository_id = ? AND commit_date BETWEEN ? AND ?", repository.id, @date_from, @date_to])
+    commits_by_day = Changeset.
+      where("repository_id = ? AND commit_date BETWEEN ? AND ?", repository.id, @date_from, @date_to).
+      group(:commit_date).
+      count
     commits_by_month = [0] * 12
     commits_by_day.each {|c| commits_by_month[(@date_to.month - c.first.to_date.month) % 12] += c.last }
 
-    changes_by_day = Change.count(
-                          :all, :group => :commit_date, :include => :changeset,
-                          :conditions => ["#{Changeset.table_name}.repository_id = ? AND #{Changeset.table_name}.commit_date BETWEEN ? AND ?", repository.id, @date_from, @date_to])
+    changes_by_day = Change.
+      joins(:changeset).
+      where("#{Changeset.table_name}.repository_id = ? AND #{Changeset.table_name}.commit_date BETWEEN ? AND ?", repository.id, @date_from, @date_to).
+      group(:commit_date).
+      count
     changes_by_month = [0] * 12
     changes_by_day.each {|c| changes_by_month[(@date_to.month - c.first.to_date.month) % 12] += c.last }
 
@@ -415,10 +397,10 @@ class RepositoriesController < ApplicationController
   end
 
   def graph_commits_per_author(repository)
-    commits_by_author = Changeset.count(:all, :group => :committer, :conditions => ["repository_id = ?", repository.id])
+    commits_by_author = Changeset.where("repository_id = ?", repository.id).group(:committer).count
     commits_by_author.to_a.sort! {|x, y| x.last <=> y.last}
 
-    changes_by_author = Change.count(:all, :group => :committer, :include => :changeset, :conditions => ["#{Changeset.table_name}.repository_id = ?", repository.id])
+    changes_by_author = Change.joins(:changeset).where("#{Changeset.table_name}.repository_id = ?", repository.id).group(:committer).count
     h = changes_by_author.inject({}) {|o, i| o[i.first] = i.last; o}
 
     fields = commits_by_author.collect {|r| r.first}
@@ -433,7 +415,7 @@ class RepositoriesController < ApplicationController
     fields = fields.collect {|c| c.gsub(%r{<.+@.+>}, '') }
 
     graph = SVG::Graph::BarHorizontal.new(
-      :height => 400,
+      :height => 30 * commits_data.length,
       :width => 800,
       :fields => fields,
       :stack => :side,
@@ -454,4 +436,3 @@ class RepositoriesController < ApplicationController
     graph.burn
   end
 end
-

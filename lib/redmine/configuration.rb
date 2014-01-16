@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,7 +20,8 @@ module Redmine
 
     # Configuration default values
     @defaults = {
-      'email_delivery' => nil
+      'email_delivery' => nil,
+      'max_concurrent_ajax_uploads' => 2
     }
 
     @config = nil

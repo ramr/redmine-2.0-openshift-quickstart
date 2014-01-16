@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -29,6 +29,7 @@ class Message < ActiveRecord::Base
                      :date_column => "#{table_name}.created_on"
   acts_as_event :title => Proc.new {|o| "#{o.board.name}: #{o.subject}"},
                 :description => :content,
+                :group => :parent,
                 :type => Proc.new {|o| o.parent_id.nil? ? 'message' : 'reply'},
                 :url => Proc.new {|o| {:controller => 'messages', :action => 'show', :board_id => o.board_id}.merge(o.parent_id.nil? ? {:id => o.id} :
                                                                                                                                        {:id => o.parent_id, :r => o.id, :anchor => "message-#{o.id}"})}
@@ -41,12 +42,14 @@ class Message < ActiveRecord::Base
   validates_length_of :subject, :maximum => 255
   validate :cannot_reply_to_locked_topic, :on => :create
 
-  after_create :add_author_as_watcher, :update_parent_last_reply
+  after_create :add_author_as_watcher, :reset_counters!
   after_update :update_messages_board
-  after_destroy :reset_board_counters
+  after_destroy :reset_counters!
+  after_create :send_notification
 
-  scope :visible, lambda {|*args| { :include => {:board => :project},
-                                          :conditions => Project.allowed_to_condition(args.shift || User.current, :view_messages, *args) } }
+  scope :visible, lambda {|*args|
+    includes(:board => :project).where(Project.allowed_to_condition(args.shift || User.current, :view_messages, *args))
+  }
 
   safe_attributes 'subject', 'content'
   safe_attributes 'locked', 'sticky', 'board_id',
@@ -63,22 +66,18 @@ class Message < ActiveRecord::Base
     errors.add :base, 'Topic is locked' if root.locked? && self != root
   end
 
-  def update_parent_last_reply
-    if parent
-      parent.reload.update_attribute(:last_reply_id, self.id)
-    end
-    board.reset_counters!
-  end
-
   def update_messages_board
     if board_id_changed?
-      Message.update_all("board_id = #{board_id}", ["id = ? OR parent_id = ?", root.id, root.id])
+      Message.update_all({:board_id => board_id}, ["id = ? OR parent_id = ?", root.id, root.id])
       Board.reset_counters!(board_id_was)
       Board.reset_counters!(board_id)
     end
   end
 
-  def reset_board_counters
+  def reset_counters!
+    if parent && parent.id
+      Message.update_all({:last_reply_id => parent.children.maximum(:id)}, {:id => parent.id})
+    end
     board.reset_counters!
   end
 
@@ -106,5 +105,11 @@ class Message < ActiveRecord::Base
 
   def add_author_as_watcher
     Watcher.create(:watchable => self.root, :user => author)
+  end
+
+  def send_notification
+    if Setting.notified_events.include?('message_posted')
+      Mailer.message_posted(self).deliver
+    end
   end
 end

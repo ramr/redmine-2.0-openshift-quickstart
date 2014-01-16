@@ -6,9 +6,9 @@ sl:
       # Use the strftime parameters for formats.
       # When no format has been given, it uses default.
       # You can provide other formats here if you like!
-      default: "%Y-%m-%d"
-      short: "%b %d"
-      long: "%B %d, %Y"
+      default: "%d.%m.%Y"
+      short: "%d. %b"
+      long: "%d. %B, %Y"
 
     day_names: [Nedelja, Ponedeljek, Torek, Sreda, Četrtek, Petek, Sobota]
     abbr_day_names: [Ned, Pon, To, Sr, Čet, Pet, Sob]
@@ -18,16 +18,16 @@ sl:
     abbr_month_names: [~, Jan, Feb, Mar, Apr, Maj, Jun, Jul, Aug, Sep, Okt, Nov, Dec]
     # Used in date_select and datime_select.
     order:
-      - :year
-      - :month
       - :day
+      - :month
+      - :year
 
   time:
     formats:
-      default: "%a, %d %b %Y %H:%M:%S %z"
+      default: "%a, %d. %b, %Y %H:%M:%S %z"
       time: "%H:%M"
-      short: "%d %b %H:%M"
-      long: "%B %d, %Y %H:%M"
+      short: "%d. %b %H:%M"
+      long: "%d. %B, %Y %H:%M"
     am: "am"
     pm: "pm"
 
@@ -49,6 +49,9 @@ sl:
       about_x_hours:
         one:   "okrog 1. ure"
         other: "okrog %{count} ur"
+      x_hours:
+        one:   "1 ura"
+        other: "%{count} ur"
       x_days:
         one:   "1 dan"
         other: "%{count} dni"
@@ -125,6 +128,7 @@ sl:
         not_same_project: "ne pripada istemu projektu"
         circular_dependency: "Ta odnos bi povzročil krožno odvisnost"
         cant_link_an_issue_with_a_descendant: "Zahtevek ne more biti povezan s svojo podnalogo"
+        earlier_than_minimum_start_date: "cannot be earlier than %{date} because of preceding issues"
 
   actionview_instancetag_blank_option: Prosimo izberite
 
@@ -157,7 +161,7 @@ sl:
   notice_not_authorized: Nimate privilegijev za dostop do te strani.
   notice_email_sent: "E-poštno sporočilo je bilo poslano %{value}"
   notice_email_error: "Ob pošiljanju e-sporočila je prišlo do napake (%{value})"
-  notice_feeds_access_key_reseted: Vaš RSS dostopni ključ je bil ponastavljen.
+  notice_feeds_access_key_reseted: Vaš Atom dostopni ključ je bil ponastavljen.
   notice_failed_to_save_issues: "Neuspelo shranjevanje %{count} zahtevka na %{total} izbranem: %{ids}."
   notice_no_issue_selected: "Izbran ni noben zahtevek! Prosimo preverite zahtevke, ki jih želite urediti."
   notice_account_pending: "Vaš račun je bil ustvarjen in čaka na potrditev s strani administratorja."
@@ -175,14 +179,12 @@ sl:
   mail_subject_register: "Aktivacija %{value} vašega računa"
   mail_body_register: 'Za aktivacijo vašega računa kliknite na naslednjo povezavo:'
   mail_body_account_information_external: "Za prijavo lahko uporabite vaš %{value} račun."
-  mail_body_account_information: Informacije o vašem računu
+  mail_body_account_information: "Informacije o vašem računu. Za spremembo gesla sledite linku 'Spremeni geslo' na naslovu za prijavo, spodaj."
   mail_subject_account_activation_request: "%{value} zahtevek za aktivacijo računa"
   mail_body_account_activation_request: "Registriral se je nov uporabnik (%{value}). Račun čaka na vašo odobritev:"
   mail_subject_reminder: "%{count} zahtevek(zahtevki) zapadejo v naslednjih %{days} dneh"
   mail_body_reminder: "%{count} zahtevek(zahtevki), ki so vam dodeljeni bodo zapadli v naslednjih %{days} dneh:"
 
-  gui_validation_error: 1 napaka
-  gui_validation_error_plural: "%{count} napak"
 
   field_name: Ime
   field_description: Opis
@@ -283,7 +285,7 @@ sl:
   setting_host_name: Ime gostitelja in pot
   setting_text_formatting: Oblikovanje besedila
   setting_wiki_compression: Stiskanje Wiki zgodovine
-  setting_feeds_limit: Meja obsega RSS virov
+  setting_feeds_limit: Meja obsega Atom virov
   setting_default_projects_public: Novi projekti so privzeto javni
   setting_autofetch_changesets: Samodejni izvleček zapisa sprememb
   setting_sys_api_enabled: Omogoči WS za upravljanje shrambe
@@ -332,7 +334,6 @@ sl:
   permission_edit_own_time_entries: Uredi beležko lastnega časa
   permission_manage_news: Uredi novice
   permission_comment_news: Komentiraj novice
-  permission_manage_documents: Uredi dokumente
   permission_view_documents: Poglej dokumente
   permission_manage_files: Uredi datoteke
   permission_view_files: Poglej datoteke
@@ -414,20 +415,20 @@ sl:
   label_information_plural: Informacije
   label_please_login: Prosimo prijavite se
   label_register: Registracija
-  label_password_lost: Izgubljeno geslo
+  label_password_lost: Spremeni geslo
   label_home: Domov
   label_my_page: Moja stran
   label_my_account: Moj račun
   label_my_projects: Moji projekti
   label_administration: Upravljanje
-  label_login: Prijavi se
-  label_logout: Odjavi se
+  label_login: Prijava
+  label_logout: Odjava
   label_help: Pomoč
   label_reported_issues: Prijavljeni zahtevki
   label_assigned_to_me_issues: Zahtevki dodeljeni meni
   label_last_login: Zadnja povezava
   label_registered_on: Registriran
-  label_activity: Aktivnost
+  label_activity: Aktivnosti
   label_overall_activity: Celotna aktivnost
   label_user_activity: "Aktivnost %{value}"
   label_new: Nov
@@ -449,8 +450,6 @@ sl:
   label_text: Dolgo besedilo
   label_attribute: Lastnost
   label_attribute_plural: Lastnosti
-  label_download: "%{count} Prenos"
-  label_download_plural: "%{count} Prenosi"
   label_no_data: Ni podatkov za prikaz
   label_change_status: Spremeni stanje
   label_history: Zgodovina
@@ -468,7 +467,7 @@ sl:
   label_news_view_all: Poglej vse novice
   label_news_added: Dodane novice
   label_settings: Nastavitve
-  label_overview: Pregled
+  label_overview: Povzetek
   label_version: Verzija
   label_version_new: Nova verzija
   label_version_plural: Verzije
@@ -550,8 +549,6 @@ sl:
   label_repository: Shramba
   label_repository_plural: Shrambe
   label_browse: Prebrskaj
-  label_modification: "%{count} sprememba"
-  label_modification_plural: "%{count} spremembe"
   label_revision: Revizija
   label_revision_plural: Revizije
   label_associated_revisions: Povezane revizije
@@ -575,16 +572,16 @@ sl:
   label_search: Išči
   label_result_plural: Rezultati
   label_all_words: Vse besede
-  label_wiki: Wiki
-  label_wiki_edit: Wiki urejanje
-  label_wiki_edit_plural: Wiki urejanja
-  label_wiki_page: Wiki stran
-  label_wiki_page_plural: Wiki strani
+  label_wiki: Predstavitev
+  label_wiki_edit: Uredi stran
+  label_wiki_edit_plural: Uredi strani
+  label_wiki_page: Predstavitvena stran
+  label_wiki_page_plural: Predstavitvene strani
   label_index_by_title: Razvrsti po naslovu
   label_index_by_date: Razvrsti po datumu
   label_current_version: Trenutna verzija
   label_preview: Predogled
-  label_feed_plural: RSS viri
+  label_feed_plural: Atom viri
   label_changes_details: Podrobnosti o vseh spremembah
   label_issue_tracking: Sledenje zahtevkom
   label_spent_time: Porabljen čas
@@ -640,11 +637,11 @@ sl:
   label_language_based: Glede na uporabnikov jezik
   label_sort_by: "Razporedi po %{value}"
   label_send_test_email: Pošlji testno e-pismo
-  label_feeds_access_key_created_on: "RSS dostopni ključ narejen %{value} nazaj"
+  label_feeds_access_key_created_on: "Atom dostopni ključ narejen %{value} nazaj"
   label_module_plural: Moduli
-  label_added_time_by: "Dodan %{author} %{age} nazaj"
-  label_updated_time_by: "Posodobljen od %{author} %{age} nazaj"
-  label_updated_time: "Posodobljen %{value} nazaj"
+  label_added_time_by: "Dodal %{author} %{age} nazaj"
+  label_updated_time_by: "Posodobil %{author} %{age} nazaj"
+  label_updated_time: "Posodobljeno %{value} nazaj"
   label_jump_to_a_project: Skoči na projekt...
   label_file_plural: Datoteke
   label_changeset_plural: Zapisi sprememb
@@ -742,7 +739,7 @@ sl:
   text_issues_ref_in_commit_messages: Zahtevki sklicev in popravkov v sporočilu predaje
   text_issue_added: "Zahtevek %{id} je sporočil(a) %{author}."
   text_issue_updated: "Zahtevek %{id} je posodobil(a) %{author}."
-  text_wiki_destroy_confirmation: Ali ste prepričani da želite izbrisati ta wiki in vso njegovo vsebino?
+  text_wiki_destroy_confirmation: Ali ste prepričani da želite izbrisati to wiki stran in vso njeno vsebino?
   text_issue_category_destroy_question: "Nekateri zahtevki (%{count}) so dodeljeni tej kategoriji. Kaj želite storiti?"
   text_issue_category_destroy_assignments: Odstrani naloge v kategoriji
   text_issue_category_reassign_to: Ponovno dodeli zahtevke tej kategoriji
@@ -874,11 +871,11 @@ sl:
   label_revision_id: Revizija %{value}
   label_api_access_key: API dostopni ključ
   label_api_access_key_created_on: API dostopni ključ ustvarjen pred %{value}
-  label_feeds_access_key: RSS dostopni ključ
+  label_feeds_access_key: Atom dostopni ključ
   notice_api_access_key_reseted: Vaš API dostopni ključ je bil ponastavljen.
   setting_rest_api_enabled: Omogoči REST spletni servis
   label_missing_api_access_key: Manjkajoč API dostopni ključ
-  label_missing_feeds_access_key: Manjkajoč RSS dostopni ključ
+  label_missing_feeds_access_key: Manjkajoč Atom dostopni ključ
   button_show: Prikaži
   text_line_separated: Dovoljenih več vrednosti (ena vrstica za vsako vrednost).
   setting_mail_handler_body_delimiters: Odreži e-pošto po eni od teh vrstic
@@ -914,7 +911,6 @@ sl:
   project_module_gantt: Gantogram
   project_module_calendar: Koledear
   button_edit_associated_wikipage: "Uredi povezano Wiki stran: %{page_title}"
-  text_are_you_sure_with_children: Izbriši zahtevek in vse podazahtevke?
   field_text: Besedilno polje
   label_user_mail_option_only_owner: Samo za stvari katerih lastnik sem
   setting_default_notification_option: Privzeta možnost obveščanja
@@ -1023,7 +1019,7 @@ sl:
   notice_issue_update_conflict: The issue has been updated by an other user while you were editing it.
   text_issue_conflict_resolution_cancel: Discard all my changes and redisplay %{link}
   permission_manage_related_issues: Manage related issues
-  field_ldap_filter: LDAP filter
+  field_auth_source_ldap_filter: LDAP filter
   label_search_for_watchers: Search for watchers to add
   notice_account_deleted: Your account has been permanently deleted.
   setting_unsubscribe: Allow users to delete their own account
@@ -1031,3 +1027,77 @@ sl:
   text_account_destroy_confirmation: |-
     Are you sure you want to proceed?
     Your account will be permanently deleted, with no way to reactivate it.
+  error_session_expired: Your session has expired. Please login again.
+  text_session_expiration_settings: "Warning: changing these settings may expire the current sessions including yours."
+  setting_session_lifetime: Session maximum lifetime
+  setting_session_timeout: Session inactivity timeout
+  label_session_expiration: Session expiration
+  permission_close_project: Close / reopen the project
+  label_show_closed_projects: View closed projects
+  button_close: Close
+  button_reopen: Reopen
+  project_status_active: active
+  project_status_closed: closed
+  project_status_archived: archived
+  text_project_closed: This project is closed and read-only.
+  notice_user_successful_create: User %{id} created.
+  field_core_fields: Standard fields
+  field_timeout: Timeout (in seconds)
+  setting_thumbnails_enabled: Display attachment thumbnails
+  setting_thumbnails_size: Thumbnails size (in pixels)
+  label_status_transitions: Status transitions
+  label_fields_permissions: Fields permissions
+  label_readonly: Read-only
+  label_required: Required
+  text_repository_identifier_info: Only lower case letters (a-z), numbers, dashes and underscores are allowed.<br />Once saved, the identifier cannot be changed.
+  field_board_parent: Parent forum
+  label_attribute_of_project: Project's %{name}
+  label_attribute_of_author: Author's %{name}
+  label_attribute_of_assigned_to: Assignee's %{name}
+  label_attribute_of_fixed_version: Target version's %{name}
+  label_copy_subtasks: Copy subtasks
+  label_copied_to: copied to
+  label_copied_from: copied from
+  label_any_issues_in_project: any issues in project
+  label_any_issues_not_in_project: any issues not in project
+  field_private_notes: Private notes
+  permission_view_private_notes: View private notes
+  permission_set_notes_private: Set notes as private
+  label_no_issues_in_project: no issues in project
+  label_any: vsi
+  label_last_n_weeks: last %{count} weeks
+  setting_cross_project_subtasks: Allow cross-project subtasks
+  label_cross_project_descendants: S podprojekti
+  label_cross_project_tree: Z drevesom projekta
+  label_cross_project_hierarchy: S projektno hierarhijo
+  label_cross_project_system: Z vsemi projekti
+  button_hide: Hide
+  setting_non_working_week_days: Non-working days
+  label_in_the_next_days: in the next
+  label_in_the_past_days: in the past
+  label_attribute_of_user: User's %{name}
+  text_turning_multiple_off: If you disable multiple values, multiple values will be
+    removed in order to preserve only one value per item.
+  label_attribute_of_issue: Issue's %{name}
+  permission_add_documents: Add documents
+  permission_edit_documents: Edit documents
+  permission_delete_documents: Delete documents
+  label_gantt_progress_line: Progress line
+  setting_jsonp_enabled: Enable JSONP support
+  field_inherit_members: Inherit members
+  field_closed_on: Closed
+  field_generate_password: Generate password
+  setting_default_projects_tracker_ids: Default trackers for new projects
+  label_total_time: Skupaj
+  notice_account_not_activated_yet: You haven't activated your account yet. If you want
+    to receive a new activation email, please <a href="%{url}">click this link</a>.
+  notice_account_locked: Your account is locked.
+  label_hidden: Hidden
+  label_visibility_private: to me only
+  label_visibility_roles: to these roles only
+  label_visibility_public: to any users
+  field_must_change_passwd: Must change password at next logon
+  notice_new_password_must_be_different: The new password must be different from the
+    current password
+  setting_mail_handler_excluded_filenames: Exclude attachments by name
+  text_convert_available: ImageMagick convert available (optional)

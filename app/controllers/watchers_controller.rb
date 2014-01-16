@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,90 +16,65 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class WatchersController < ApplicationController
-  before_filter :find_project
-  before_filter :require_login, :check_project_privacy, :only => [:watch, :unwatch]
-  before_filter :authorize, :only => [:new, :destroy]
+  before_filter :require_login, :find_watchables, :only => [:watch, :unwatch]
 
   def watch
-    if @watched.respond_to?(:visible?) && !@watched.visible?(User.current)
-      render_403
-    else
-      set_watcher(User.current, true)
-    end
+    set_watcher(@watchables, User.current, true)
   end
 
   def unwatch
-    set_watcher(User.current, false)
+    set_watcher(@watchables, User.current, false)
   end
 
+  before_filter :find_project, :authorize, :only => [:new, :create, :append, :destroy, :autocomplete_for_user]
+  accept_api_auth :create, :destroy
+
   def new
-    respond_to do |format|
-      format.js do
-        render :update do |page|
-          page.replace_html 'ajax-modal', :partial => 'watchers/new', :locals => {:watched => @watched}
-          page << "showModal('ajax-modal', '400px');"
-          page << "$('ajax-modal').addClassName('new-watcher');"
-        end
-      end
-    end
   end
 
   def create
-    if params[:watcher].is_a?(Hash) && request.post?
-      user_ids = params[:watcher][:user_ids] || [params[:watcher][:user_id]]
-      user_ids.each do |user_id|
-        Watcher.create(:watchable => @watched, :user_id => user_id)
-      end
+    user_ids = []
+    if params[:watcher].is_a?(Hash)
+      user_ids << (params[:watcher][:user_ids] || params[:watcher][:user_id])
+    else
+      user_ids << params[:user_id]
+    end
+    user_ids.flatten.compact.uniq.each do |user_id|
+      Watcher.create(:watchable => @watched, :user_id => user_id)
     end
     respond_to do |format|
       format.html { redirect_to_referer_or {render :text => 'Watcher added.', :layout => true}}
-      format.js do
-        render :update do |page|
-          page.replace_html 'ajax-modal', :partial => 'watchers/new', :locals => {:watched => @watched}
-          page.replace_html 'watchers', :partial => 'watchers/watchers', :locals => {:watched => @watched}
-        end
-      end
+      format.js
+      format.api { render_api_ok }
     end
   end
 
   def append
     if params[:watcher].is_a?(Hash)
       user_ids = params[:watcher][:user_ids] || [params[:watcher][:user_id]]
-      users = User.active.find_all_by_id(user_ids)
-      respond_to do |format|
-        format.js do
-          render :update do |page|
-            users.each do |user|
-              page << %|$$("#issue_watcher_user_ids_#{user.id}").each(function(el){el.remove();});|
-            end
-            page.insert_html :bottom, 'watchers_inputs', :text => watchers_checkboxes(nil, users, true)
-          end
-        end
-      end
+      @users = User.active.find_all_by_id(user_ids)
     end
   end
 
   def destroy
-    @watched.set_watcher(User.find(params[:user_id]), false) if request.post?
+    @watched.set_watcher(User.find(params[:user_id]), false)
     respond_to do |format|
       format.html { redirect_to :back }
-      format.js do
-        render :update do |page|
-          page.replace_html 'watchers', :partial => 'watchers/watchers', :locals => {:watched => @watched}
-        end
-      end
+      format.js
+      format.api { render_api_ok }
     end
   end
 
   def autocomplete_for_user
-    @users = User.active.like(params[:q]).find(:all, :limit => 100)
+    @users = User.active.sorted.like(params[:q]).limit(100).all
     if @watched
       @users -= @watched.watcher_users
     end
     render :layout => false
   end
 
-private
+  private
+
   def find_project
     if params[:object_type] && params[:object_id]
       klass = Object.const_get(params[:object_type].camelcase)
@@ -113,16 +88,22 @@ private
     render_404
   end
 
-  def set_watcher(user, watching)
-    @watched.set_watcher(user, watching)
+  def find_watchables
+    klass = Object.const_get(params[:object_type].camelcase) rescue nil
+    if klass && klass.respond_to?('watched_by')
+      @watchables = klass.find_all_by_id(Array.wrap(params[:object_id]))
+      raise Unauthorized if @watchables.any? {|w| w.respond_to?(:visible?) && !w.visible?}
+    end
+    render_404 unless @watchables.present?
+  end
+
+  def set_watcher(watchables, user, watching)
+    watchables.each do |watchable|
+      watchable.set_watcher(user, watching)
+    end
     respond_to do |format|
       format.html { redirect_to_referer_or {render :text => (watching ? 'Watcher added.' : 'Watcher removed.'), :layout => true}}
-      format.js do
-        render(:update) do |page|
-          c = watcher_css(@watched)
-          page << %|$$(".#{c}").each(function(el){el.innerHTML="#{escape_javascript watcher_link(@watched, user)}"});|
-        end
-      end
+      format.js { render :partial => 'set_watcher', :locals => {:user => user, :watched => watchables} }
     end
   end
 end

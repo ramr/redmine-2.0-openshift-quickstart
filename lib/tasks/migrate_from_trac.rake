@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 require 'active_record'
-require 'iconv'
+require 'iconv' if RUBY_VERSION < '1.9'
 require 'pp'
 
 namespace :redmine do
@@ -30,7 +30,7 @@ namespace :redmine do
         assigned_status = IssueStatus.find_by_position(2)
         resolved_status = IssueStatus.find_by_position(3)
         feedback_status = IssueStatus.find_by_position(4)
-        closed_status = IssueStatus.find :first, :conditions => { :is_closed => true }
+        closed_status = IssueStatus.where(:is_closed => true).first
         STATUS_MAPPING = {'new' => DEFAULT_STATUS,
                           'reopened' => feedback_status,
                           'assigned' => assigned_status,
@@ -61,7 +61,7 @@ namespace :redmine do
                            'patch' =>TRACKER_FEATURE
                            }
 
-        roles = Role.find(:all, :conditions => {:builtin => 0}, :order => 'position ASC')
+        roles = Role.where(:builtin => 0).order('position ASC').all
         manager_role = roles[0]
         developer_role = roles[1]
         DEFAULT_ROLE = roles.last
@@ -153,7 +153,11 @@ namespace :redmine do
       private
         def trac_fullpath
           attachment_type = read_attribute(:type)
-          trac_file = filename.gsub( /[^a-zA-Z0-9\-_\.!~*']/n ) {|x| sprintf('%%%02x', x[0]) }
+          #replace exotic characters with their hex representation to avoid invalid filenames
+          trac_file = filename.gsub( /[^a-zA-Z0-9\-_\.!~*']/n ) do |x|
+            codepoint = RUBY_VERSION < '1.9' ? x[0] : x.codepoints.to_a[0]
+            sprintf('%%%02x', codepoint)
+          end
           "#{TracMigrate.trac_attachments_directory}/#{attachment_type}/#{id}/#{trac_file}"
         end
       end
@@ -245,8 +249,8 @@ namespace :redmine do
           if name_attr = TracSessionAttribute.find_by_sid_and_name(username, 'name')
             name = name_attr.value
           end
-          name =~ (/(.*)(\s+\w+)?/)
-          fn = $1.strip
+          name =~ (/(\w+)(\s+\w+)?/)
+          fn = ($1 || "-").strip
           ln = ($2 || '-').strip
 
           u = User.new :mail => mail.gsub(/[^-@a-z0-9\.]/i, '-'),
@@ -257,9 +261,9 @@ namespace :redmine do
           u.password = 'trac'
           u.admin = true if TracPermission.find_by_username_and_action(username, 'admin')
           # finally, a default user is used if the new user is not valid
-          u = User.find(:first) unless u.save
+          u = User.first unless u.save
         end
-        # Make sure he is a member of the project
+        # Make sure user is a member of the project
         if project_member && !u.member_of?(@target_project)
           role = DEFAULT_ROLE
           if u.admin
@@ -390,7 +394,7 @@ namespace :redmine do
         # Components
         print "Migrating components"
         issues_category_map = {}
-        TracComponent.find(:all).each do |component|
+        TracComponent.all.each do |component|
         print '.'
         STDOUT.flush
           c = IssueCategory.new :project => @target_project,
@@ -404,7 +408,7 @@ namespace :redmine do
         # Milestones
         print "Migrating milestones"
         version_map = {}
-        TracMilestone.find(:all).each do |milestone|
+        TracMilestone.all.each do |milestone|
           print '.'
           STDOUT.flush
           # First we try to find the wiki page...
@@ -443,18 +447,18 @@ namespace :redmine do
                                         :field_format => 'string')
 
           next if f.new_record?
-          f.trackers = Tracker.find(:all)
+          f.trackers = Tracker.all
           f.projects << @target_project
           custom_field_map[field.name] = f
         end
         puts
 
         # Trac 'resolution' field as a Redmine custom field
-        r = IssueCustomField.find(:first, :conditions => { :name => "Resolution" })
+        r = IssueCustomField.where(:name => "Resolution").first
         r = IssueCustomField.new(:name => 'Resolution',
                                  :field_format => 'list',
                                  :is_filter => true) if r.nil?
-        r.trackers = Tracker.find(:all)
+        r.trackers = Tracker.all
         r.projects << @target_project
         r.possible_values = (r.possible_values + %w(fixed invalid wontfix duplicate worksforme)).flatten.compact.uniq
         r.save!
@@ -549,7 +553,7 @@ namespace :redmine do
         # Wiki
         print "Migrating wiki"
         if wiki.save
-          TracWikiPage.find(:all, :order => 'name, version').each do |page|
+          TracWikiPage.order('name, version').all.each do |page|
             # Do not migrate Trac manual wiki pages
             next if TRAC_WIKI_PAGES.include?(page.name)
             wiki_edit_count += 1
@@ -603,10 +607,7 @@ namespace :redmine do
       end
 
       def self.encoding(charset)
-        @ic = Iconv.new('UTF-8', charset)
-      rescue Iconv::InvalidEncoding
-        puts "Invalid encoding!"
-        return false
+        @charset = charset
       end
 
       def self.set_trac_directory(path)
@@ -713,11 +714,13 @@ namespace :redmine do
         end
       end
 
-    private
       def self.encode(text)
-        @ic.iconv text
-      rescue
-        text
+        if RUBY_VERSION < '1.9'
+          @ic ||= Iconv.new('UTF-8', @charset)
+          @ic.iconv text
+        else
+          text.to_s.force_encoding(@charset).encode('UTF-8')
+        end
       end
     end
 
@@ -763,10 +766,19 @@ namespace :redmine do
     prompt('Target project identifier') {|identifier| TracMigrate.target_project_identifier identifier}
     puts
 
-    # Turn off email notifications
-    Setting.notified_events = []
-
-    TracMigrate.migrate
+    old_notified_events = Setting.notified_events
+    old_password_min_length = Setting.password_min_length
+    begin
+      # Turn off email notifications temporarily
+      Setting.notified_events = []
+      Setting.password_min_length = 4
+      # Run the migration
+      TracMigrate.migrate
+    ensure
+      # Restore previous settings
+      Setting.notified_events = old_notified_events
+      Setting.password_min_length = old_password_min_length
+    end
   end
 end
 

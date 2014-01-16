@@ -21,7 +21,7 @@ fi
 # Confirm database exists, if not create it
 qry="select * from redmine.users;"
 if ! mysql -h "$OPENSHIFT_MYSQL_DB_HOST"              \
-                    -P "$OPENSHIFTMYSQL_DB_PORT"    \
+                    -P "$OPENSHIFT_MYSQL_DB_PORT"    \
                     -u "$OPENSHIFT_MYSQL_DB_USERNAME"          \
                     --password="$OPENSHIFT_MYSQL_DB_PASSWORD"  \
                     "$OPENSHIFT_APP_NAME" -e "$qry" > /dev/null 2>&1; then
@@ -29,9 +29,10 @@ if ! mysql -h "$OPENSHIFT_MYSQL_DB_HOST"              \
     echo "Schema not found! Recreating redmine schema"
     echo
     mysql -h "$OPENSHIFT_MYSQL_DB_HOST"              \
-                   -u "$OPENSHIFT_MYSQL_DB_USERNAME"          \
-                   --password="$OPENSHIFT_MYSQL_DB_PASSWORD"  \
-                   "$OPENSHIFT_APP_NAME" <<MYEOF
+                    -P "$OPENSHIFT_MYSQL_DB_PORT"    \
+                    -u "$OPENSHIFT_MYSQL_DB_USERNAME"          \
+                    --password="$OPENSHIFT_MYSQL_DB_PASSWORD"  \
+                    "$OPENSHIFT_APP_NAME" <<MYEOF
 drop database if exists redmine;
 create database redmine character set utf8;
 MYEOF

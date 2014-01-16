@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,9 +17,6 @@
 
 class SearchController < ApplicationController
   before_filter :find_optional_project
-
-  helper :messages
-  include MessagesHelper
 
   def index
     @question = params[:q] || ""
@@ -43,8 +40,8 @@ class SearchController < ApplicationController
     begin; offset = params[:offset].to_time if params[:offset]; rescue; end
 
     # quick jump to an issue
-    if @question.match(/^#?(\d+)$/) && Issue.visible.find_by_id($1.to_i)
-      redirect_to :controller => "issues", :action => "show", :id => $1
+    if (m = @question.match(/^#?(\d+)$/)) && (issue = Issue.visible.find_by_id(m[1].to_i))
+      redirect_to issue_path(issue)
       return
     end
 

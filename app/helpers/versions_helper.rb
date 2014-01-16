@@ -1,7 +1,7 @@
 # encoding: utf-8
 #
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,24 +19,30 @@
 
 module VersionsHelper
 
-  STATUS_BY_CRITERIAS = %w(category tracker status priority author assigned_to)
+  def version_anchor(version)
+    if @project == version.project
+      anchor version.name
+    else
+      anchor "#{version.project.try(:identifier)}-#{version.name}"
+    end
+  end
+
+  STATUS_BY_CRITERIAS = %w(tracker status priority author assigned_to category)
 
   def render_issue_status_by(version, criteria)
-    criteria = 'category' unless STATUS_BY_CRITERIAS.include?(criteria)
+    criteria = 'tracker' unless STATUS_BY_CRITERIAS.include?(criteria)
 
     h = Hash.new {|k,v| k[v] = [0, 0]}
     begin
       # Total issue count
-      Issue.count(:group => criteria,
-                  :conditions => ["#{Issue.table_name}.fixed_version_id = ?", version.id]).each {|c,s| h[c][0] = s}
+      Issue.where(:fixed_version_id => version.id).group(criteria).count.each {|c,s| h[c][0] = s}
       # Open issues count
-      Issue.count(:group => criteria,
-                  :include => :status,
-                  :conditions => ["#{Issue.table_name}.fixed_version_id = ? AND #{IssueStatus.table_name}.is_closed = ?", version.id, false]).each {|c,s| h[c][1] = s}
+      Issue.open.where(:fixed_version_id => version.id).group(criteria).count.each {|c,s| h[c][1] = s}
     rescue ActiveRecord::RecordNotFound
     # When grouping by an association, Rails throws this exception if there's no result (bug)
     end
-    counts = h.keys.compact.sort.collect {|k| {:group => k, :total => h[k][0], :open => h[k][1], :closed => (h[k][0] - h[k][1])}}
+    # Sort with nil keys in last position
+    counts = h.keys.sort {|a,b| a.nil? ? 1 : (b.nil? ? -1 : a <=> b)}.collect {|k| {:group => k, :total => h[k][0], :open => h[k][1], :closed => (h[k][0] - h[k][1])}}
     max = counts.collect {|c| c[:total]}.max
 
     render :partial => 'issue_counts', :locals => {:version => version, :criteria => criteria, :counts => counts, :max => max}

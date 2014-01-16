@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,19 +19,22 @@ class Document < ActiveRecord::Base
   include Redmine::SafeAttributes
   belongs_to :project
   belongs_to :category, :class_name => "DocumentCategory", :foreign_key => "category_id"
-  acts_as_attachable :delete_permission => :manage_documents
+  acts_as_attachable :delete_permission => :delete_documents
 
   acts_as_searchable :columns => ['title', "#{table_name}.description"], :include => :project
   acts_as_event :title => Proc.new {|o| "#{l(:label_document)}: #{o.title}"},
-                :author => Proc.new {|o| (a = o.attachments.find(:first, :order => "#{Attachment.table_name}.created_on ASC")) ? a.author : nil },
+                :author => Proc.new {|o| o.attachments.reorder("#{Attachment.table_name}.created_on ASC").first.try(:author) },
                 :url => Proc.new {|o| {:controller => 'documents', :action => 'show', :id => o.id}}
   acts_as_activity_provider :find_options => {:include => :project}
 
   validates_presence_of :project, :title, :category
   validates_length_of :title, :maximum => 60
 
-  scope :visible, lambda {|*args| { :include => :project,
-                                          :conditions => Project.allowed_to_condition(args.shift || User.current, :view_documents, *args) } }
+  after_create :send_notification
+
+  scope :visible, lambda {|*args|
+    includes(:project).where(Project.allowed_to_condition(args.shift || User.current, :view_documents, *args))
+  }
 
   safe_attributes 'category_id', 'title', 'description'
 
@@ -52,5 +55,13 @@ class Document < ActiveRecord::Base
       @updated_on = (a && a.created_on) || created_on
     end
     @updated_on
+  end
+
+  private
+
+  def send_notification
+    if Setting.notified_events.include?('document_added')
+      Mailer.document_added(self).deliver
+    end
   end
 end

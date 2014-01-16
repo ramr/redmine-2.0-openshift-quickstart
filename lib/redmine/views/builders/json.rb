@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -15,14 +15,29 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-require 'blankslate'
+require 'redmine/views/builders/structure'
 
 module Redmine
   module Views
     module Builders
       class Json < Structure
+        attr_accessor :jsonp
+
+        def initialize(request, response)
+          super
+          callback = request.params[:callback] || request.params[:jsonp]
+          if callback && Setting.jsonp_enabled?
+            self.jsonp = callback.to_s.gsub(/[^a-zA-Z0-9_]/, '')
+          end
+        end
+
         def output
-          @struct.first.to_json
+          json = @struct.first.to_json
+          if jsonp.present?
+            json = "#{jsonp}(#{json})"
+            response.content_type = 'application/javascript'
+          end
+          json
         end
       end
     end

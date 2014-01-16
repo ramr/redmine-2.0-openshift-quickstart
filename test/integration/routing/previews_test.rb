@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,7 +19,7 @@ require File.expand_path('../../../test_helper', __FILE__)
 
 class RoutingPreviewsTest < ActionController::IntegrationTest
   def test_previews
-    ["get", "post"].each do |method|
+    ["get", "post", "put"].each do |method|
       assert_routing(
           { :method => method, :path => "/issues/preview/new/123" },
           { :controller => 'previews', :action => 'issue', :project_id => '123' }

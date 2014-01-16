@@ -1,6 +1,7 @@
 # Turkish translations for Ruby on Rails
 # by Ozgun Ataman (ozataman@gmail.com)
 # by Burak Yigit Kaya (ben@byk.im)
+# by Mert Salih Kaplan (mail@mertskaplan.com)
 
 tr:
   locale:
@@ -55,6 +56,9 @@ tr:
       about_x_hours:
         one: 'yaklaşık 1 saat'
         other: 'yaklaşık %{count} saat'
+      x_hours:
+        one:   "1 saat"
+        other: "%{count} saat"
       x_days:
         one: '1 gün'
         other: '%{count} gün'
@@ -148,6 +152,7 @@ tr:
         not_same_project: "aynı projeye ait değil"
         circular_dependency: "Bu ilişki döngüsel bağımlılık meydana getirecektir"
         cant_link_an_issue_with_a_descendant: "Bir iş, alt işlerinden birine bağlanamaz"
+        earlier_than_minimum_start_date: "cannot be earlier than %{date} because of preceding issues"
       models:
 
   actionview_instancetag_blank_option: Lütfen Seçin
@@ -180,7 +185,7 @@ tr:
   notice_not_authorized: Bu sayfaya erişme yetkiniz yok.
   notice_email_sent: "E-posta gönderildi %{value}"
   notice_email_error: "E-posta gönderilirken bir hata oluştu (%{value})"
-  notice_feeds_access_key_reseted: RSS erişim anahtarınız sıfırlandı.
+  notice_feeds_access_key_reseted: Atom erişim anahtarınız sıfırlandı.
   notice_failed_to_save_issues: "Failed to save %{count} issue(s) on %{total} selected: %{ids}."
   notice_no_issue_selected: "Seçili iş yok! Lütfen, düzenlemek istediğiniz işleri işaretleyin."
   notice_account_pending: "Hesabınız oluşturuldu ve yönetici onayı bekliyor."
@@ -201,8 +206,6 @@ tr:
   mail_subject_account_activation_request: "%{value} hesabı etkinleştirme isteği"
   mail_body_account_activation_request: "Yeni bir kullanıcı (%{value}) kaydedildi. Hesap onaylanmayı bekliyor:"
 
-  gui_validation_error: 1 hata
-  gui_validation_error_plural: "%{count} hata"
 
   field_name: İsim
   field_description: Yorum
@@ -252,7 +255,7 @@ tr:
   field_effective_date: Tarih
   field_password: Parola
   field_new_password: Yeni Parola
-  field_password_confirmation: Onay
+  field_password_confirmation: Parola Doğrulama
   field_version: Sürüm
   field_type: Tip
   field_host: Host
@@ -276,7 +279,7 @@ tr:
   field_activity: Etkinlik
   field_spent_on: Tarih
   field_identifier: Tanımlayıcı
-  field_is_filter: filtre olarak kullanılmış
+  field_is_filter: süzgeç olarak kullanılmış
   field_issue_to: İlişkili iş
   field_delay: Gecikme
   field_assignable: Bu role atanabilecek işler
@@ -410,8 +413,6 @@ tr:
   label_text: Uzun Metin
   label_attribute: Nitelik
   label_attribute_plural: Nitelikler
-  label_download: "%{count} indirme"
-  label_download_plural: "%{count} indirme"
   label_no_data: Gösterilecek veri yok
   label_change_status: Değişim Durumu
   label_history: Geçmiş
@@ -471,7 +472,7 @@ tr:
   label_gantt: İş-Zaman Çizelgesi
   label_internal: Dahili
   label_last_changes: "Son %{count} değişiklik"
-  label_change_view_all: Tüm Değişiklikleri gör
+  label_change_view_all: Tüm Değişiklikleri göster
   label_personalize_page: Bu sayfayı kişiselleştir
   label_comment: Yorum
   label_comment_plural: Yorumlar
@@ -485,8 +486,8 @@ tr:
   label_query: Özel Sorgu
   label_query_plural: Özel Sorgular
   label_query_new: Yeni Sorgu
-  label_filter_add: Filtre ekle
-  label_filter_plural: Filtreler
+  label_filter_add: Süzgeç ekle
+  label_filter_plural: Süzgeçler
   label_equals: Eşit
   label_not_equals: Eşit değil
   label_in_less_than: küçüktür
@@ -511,8 +512,6 @@ tr:
   label_repository: Depo
   label_repository_plural: Depolar
   label_browse: Gözat
-  label_modification: "%{count} değişim"
-  label_modification_plural: "%{count} değişim"
   label_revision: Değişiklik
   label_revision_plural: Değişiklikler
   label_associated_revisions: Birleştirilmiş değişiklikler
@@ -598,7 +597,7 @@ tr:
   label_language_based: Kullanıcı dili bazlı
   label_sort_by: "%{value} göre sırala"
   label_send_test_email: Test e-postası gönder
-  label_feeds_access_key_created_on: "RSS erişim anahtarı %{value} önce oluşturuldu"
+  label_feeds_access_key_created_on: "Atom erişim anahtarı %{value} önce oluşturuldu"
   label_module_plural: Modüller
   label_added_time_by: "%{author} tarafından %{age} önce eklendi"
   label_updated_time: "%{value} önce güncellendi"
@@ -743,7 +742,7 @@ tr:
   label_generate_key: "Anahtar oluştur"
   setting_sequential_project_identifiers: "Sıralı proje tanımlayıcıları oluştur"
   field_parent_title: Üst sayfa
-  text_email_delivery_not_configured: "Email delivery is not configured, and notifications are disabled.\nConfigure your SMTP server in config/configuration.yml and restart the application to enable them."
+  text_email_delivery_not_configured: "E-posta gönderme yapılandırılmadı ve bildirimler devre dışı.\nconfig/configuration.yml içinden SMTP sunucusunu yapılandırın ve uygulamayı yeniden başlatın."
   text_enumeration_category_reassign_to: 'Hepsini şuna çevir:'
   label_issue_watchers: Takipçiler
   mail_body_reminder: "Size atanmış olan %{count} iş %{days} gün içerisinde bitirilmeli:"
@@ -760,14 +759,14 @@ tr:
   label_renamed: yeniden adlandırılmış
   label_copied: kopyalanmış
   setting_plain_text_mail: sadece düz metin (HTML yok)
-  permission_view_files: Dosyaları görme
+  permission_view_files: Dosyaları gösterme
   permission_edit_issues: İşleri düzenleme
   permission_edit_own_time_entries: Kendi zaman girişlerini düzenleme
   permission_manage_public_queries: Herkese açık sorguları yönetme
   permission_add_issues: İş ekleme
   permission_log_time: Harcanan zamanı kaydetme
-  permission_view_changesets: Değişimleri görme(SVN, vs.)
-  permission_view_time_entries: Harcanan zamanı görme
+  permission_view_changesets: Değişimleri gösterme(SVN, vs.)
+  permission_view_time_entries: Harcanan zamanı gösterme
   permission_manage_versions: Sürümleri yönetme
   permission_manage_wiki: Wiki'yi yönetme
   permission_manage_categories: İş kategorilerini yönetme
@@ -775,40 +774,39 @@ tr:
   permission_comment_news: Haberlere yorum yapma
   permission_delete_messages: Mesaj silme
   permission_select_project_modules: Proje modüllerini seçme
-  permission_manage_documents: Belgeleri yönetme
   permission_edit_wiki_pages: Wiki sayfalarını düzenleme
   permission_add_issue_watchers: Takipçi ekleme
-  permission_view_gantt: İş-Zaman çizelgesi görme
+  permission_view_gantt: İş-Zaman çizelgesi gösterme
   permission_move_issues: İşlerin yerini değiştirme
   permission_manage_issue_relations: İşlerin biribiriyle bağlantılarını yönetme
   permission_delete_wiki_pages: Wiki sayfalarını silme
   permission_manage_boards: Panoları yönetme
   permission_delete_wiki_pages_attachments: Ekleri silme
-  permission_view_wiki_edits: Wiki geçmişini görme
+  permission_view_wiki_edits: Wiki geçmişini gösterme
   permission_add_messages: Mesaj gönderme
-  permission_view_messages: Mesajları görme
+  permission_view_messages: Mesajları gösterme
   permission_manage_files: Dosyaları yönetme
   permission_edit_issue_notes: Notları düzenleme
   permission_manage_news: Haberleri yönetme
-  permission_view_calendar: Takvimleri görme
+  permission_view_calendar: Takvimleri gösterme
   permission_manage_members: Üyeleri yönetme
   permission_edit_messages: Mesajları düzenleme
   permission_delete_issues: İşleri silme
-  permission_view_issue_watchers: Takipçi listesini görme
+  permission_view_issue_watchers: Takipçi listesini gösterme
   permission_manage_repository: Depo yönetimi
   permission_commit_access: Gönderme erişimi
   permission_browse_repository: Depoya gözatma
-  permission_view_documents: Belgeleri görme
+  permission_view_documents: Belgeleri gösterme
   permission_edit_project: Projeyi düzenleme
   permission_add_issue_notes: Not ekleme
   permission_save_queries: Sorgu kaydetme
-  permission_view_wiki_pages: Wiki görme
+  permission_view_wiki_pages: Wiki gösterme
   permission_rename_wiki_pages: Wiki sayfasının adını değiştirme
   permission_edit_time_entries: Zaman kayıtlarını düzenleme
   permission_edit_own_issue_notes: Kendi notlarını düzenleme
   setting_gravatar_enabled: Kullanıcı resimleri için Gravatar kullan
   label_example: Örnek
-  text_repository_usernames_mapping: "Select ou update the Redmine user mapped to each username found in the repository log.\nUsers with the same Redmine and repository username or email are automatically mapped."
+  text_repository_usernames_mapping: "Redmine kullanıcı adlarını depo değişiklik kayıtlarındaki kullanıcı adlarıyla eşleştirin veya eşleştirmeleri güncelleyin.\nRedmine kullanıcı adları ile depo kullanıcı adları aynı olan kullanıcılar otomatik olarak eşlendirilecektir."
   permission_edit_own_messages: Kendi mesajlarını düzenleme
   permission_delete_own_messages: Kendi mesajlarını silme
   label_user_activity: "%{value} kullanıcısının etkinlikleri"
@@ -848,7 +846,7 @@ tr:
   mail_body_wiki_content_updated: "'%{id}' wiki sayfası, %{author} tarafından güncellendi."
   permission_add_project: Proje oluştur
   setting_new_project_user_role_id: Yönetici olmayan ancak proje yaratabilen kullanıcıya verilen rol
-  label_view_all_revisions: Tüm değişiklikleri gör
+  label_view_all_revisions: Tüm değişiklikleri göster
   label_tag: Etiket
   label_branch: Kol
   error_no_tracker_in_project: Bu projeye bağlanmış bir iş tipi yok. Lütfen proje ayarlarını kontrol edin.
@@ -893,16 +891,16 @@ tr:
   error_workflow_copy_source: Lütfen kaynak iş tipi ve rolleri seçin
   label_update_issue_done_ratios: İş tamamlanma oranlarını güncelle
   setting_start_of_week: Takvimleri şundan başlat
-  permission_view_issues: İşleri Gör
+  permission_view_issues: İşleri Göster
   label_display_used_statuses_only: Sadece bu iş tipi tarafından kullanılan durumları göster
   label_revision_id: Değişiklik %{value}
   label_api_access_key: API erişim anahtarı
   label_api_access_key_created_on: API erişim anahtarı %{value} önce oluşturuldu
-  label_feeds_access_key: RSS erişim anahtarı
+  label_feeds_access_key: Atom erişim anahtarı
   notice_api_access_key_reseted: API erişim anahtarınız sıfırlandı.
   setting_rest_api_enabled: REST web servisini etkinleştir
   label_missing_api_access_key: Bir API erişim anahtarı eksik
-  label_missing_feeds_access_key: Bir RSS erişim anahtarı eksik
+  label_missing_feeds_access_key: Bir Atom erişim anahtarı eksik
   button_show: Göster
   text_line_separated: Çoklu değer girilebilir (her satıra bir değer).
   setting_mail_handler_body_delimiters: Şu satırların birinden sonra e-postayı sonlandır
@@ -935,8 +933,7 @@ tr:
   field_time_entries: Zaman Kayıtları
   project_module_gantt: İş-Zaman Çizelgesi
   project_module_calendar: Takvim
-  button_edit_associated_wikipage: "Edit associated Wiki page: %{page_title}"
-  text_are_you_sure_with_children: İş, tüm alt işlerle birlikte silinsin mi?
+  button_edit_associated_wikipage: "İlişkilendirilmiş Wiki sayfasını düzenle: %{page_title}"
   field_text: Metin alanı
   label_user_mail_option_only_owner: Sadece sahibi olduğum şeyler için
   setting_default_notification_option: Varsayılan bildirim seçeneği
@@ -951,9 +948,9 @@ tr:
   field_visible: Görünür
   setting_emails_header: "E-Posta başlığı"
   setting_commit_logtime_activity_id: Kaydedilen zaman için etkinlik
-  text_time_logged_by_changeset: Applied in changeset %{value}.
+  text_time_logged_by_changeset: Değişiklik uygulandı %{value}.
   setting_commit_logtime_enabled: Zaman kaydını etkinleştir
-  notice_gantt_chart_truncated: The chart was truncated because it exceeds the maximum number of items that can be displayed (%{max})
+  notice_gantt_chart_truncated: Görüntülenebilir öğelerin sayısını aştığı için tablo kısaltıldı (%{max})
   setting_gantt_items_limit: İş-Zaman çizelgesinde gösterilecek en fazla öğe sayısı
   field_warn_on_leaving_unsaved: Kaydedilmemiş metin bulunan bir sayfadan çıkarken beni uyar
   text_warn_on_leaving_unsaved: Bu sayfada terkettiğiniz takdirde kaybolacak kaydedilmemiş metinler var.
@@ -962,8 +959,8 @@ tr:
   label_news_comment_added: Bir habere yorum eklendi
   button_expand_all: Tümünü genişlet
   button_collapse_all: Tümünü daralt
-  label_additional_workflow_transitions_for_assignee: Additional transitions allowed when the user is the assignee
-  label_additional_workflow_transitions_for_author: Additional transitions allowed when the user is the author
+  label_additional_workflow_transitions_for_assignee: Kullanıcı atanan olduğu zaman tanınacak ek yetkiler
+  label_additional_workflow_transitions_for_author: Kullanıcı yazar olduğu zaman tanınacak ek yetkiler
   label_bulk_edit_selected_time_entries: Seçilen zaman kayıtlarını toplu olarak düzenle
   text_time_entries_destroy_confirmation: Seçilen zaman kaydını/kayıtlarını silmek istediğinize emin misiniz?
   label_role_anonymous: Anonim
@@ -971,82 +968,154 @@ tr:
   label_issue_note_added: Not eklendi
   label_issue_status_updated: Durum güncellendi
   label_issue_priority_updated: Öncelik güncellendi
-  label_issues_visibility_own: Issues created by or assigned to the user
+  label_issues_visibility_own: Kullanıcı tarafından oluşturulmuş ya da kullanıcıya atanmış sorunlar
   field_issues_visibility: İşlerin görünürlüğü
   label_issues_visibility_all: Tüm işler
-  permission_set_own_issues_private: Set own issues public or private
+  permission_set_own_issues_private: Kendi işlerini özel ya da genel olarak işaretle
   field_is_private: Özel
   permission_set_issues_private: İşleri özel ya da genel olarak işaretleme
   label_issues_visibility_public: Özel olmayan tüm işler
-  text_issues_destroy_descendants_confirmation: This will also delete %{count} subtask(s).
-  field_commit_logs_encoding: Commit messages encoding
+  text_issues_destroy_descendants_confirmation: "%{count} alt görev de silinecek."
+  field_commit_logs_encoding: Değişiklik mesajı kodlaması(encoding)
   field_scm_path_encoding: Yol kodlaması(encoding)
   text_scm_path_encoding_note: "Varsayılan: UTF-8"
-  field_path_to_repository: Path to repository
+  field_path_to_repository: Depo yolu
   field_root_directory: Ana dizin
   field_cvs_module: Modül
   field_cvsroot: CVSROOT
-  text_mercurial_repository_note: Local repository (e.g. /hgrepo, c:\hgrepo)
+  text_mercurial_repository_note: Yerel depo (ör. /hgrepo, c:\hgrepo)
   text_scm_command: Komut
   text_scm_command_version: Sürüm
-  label_git_report_last_commit: Report last commit for files and directories
-  text_scm_config: You can configure your scm commands in config/configuration.yml. Please restart the application after editing it.
-  text_scm_command_not_available: Scm command is not available. Please check settings on the administration panel.
-  notice_issue_successful_create: Issue %{id} created.
-  label_between: between
-  setting_issue_group_assignment: Allow issue assignment to groups
-  label_diff: diff
-  text_git_repository_note: Repository is bare and local (e.g. /gitrepo, c:\gitrepo)
-  description_query_sort_criteria_direction: Sort direction
-  description_project_scope: Search scope
-  description_filter: Filter
-  description_user_mail_notification: Mail notification settings
-  description_date_from: Enter start date
-  description_message_content: Message content
-  description_available_columns: Available Columns
-  description_date_range_interval: Choose range by selecting start and end date
-  description_issue_category_reassign: Choose issue category
-  description_search: Searchfield
-  description_notes: Notes
-  description_date_range_list: Choose range from list
-  description_choose_project: Projects
-  description_date_to: Enter end date
-  description_query_sort_criteria_attribute: Sort attribute
-  description_wiki_subpages_reassign: Choose new parent page
-  description_selected_columns: Selected Columns
-  label_parent_revision: Parent
-  label_child_revision: Child
-  error_scm_annotate_big_text_file: The entry cannot be annotated, as it exceeds the maximum text file size.
-  setting_default_issue_start_date_to_creation_date: Use current date as start date for new issues
-  button_edit_section: Edit this section
-  setting_repositories_encodings: Attachments and repositories encodings
-  description_all_columns: All Columns
-  button_export: Export
-  label_export_options: "%{export_format} export options"
-  error_attachment_too_big: This file cannot be uploaded because it exceeds the maximum allowed file size (%{max_size})
-  notice_failed_to_save_time_entries: "Failed to save %{count} time entrie(s) on %{total} selected: %{ids}."
+  label_git_report_last_commit: Son gönderilen dosya ve dizinleri raporla
+  notice_issue_successful_create: İş %{id} oluşturuldu.
+  label_between: arasında
+  setting_issue_group_assignment: Gruplara iş atanmasına izin ver
+  label_diff: farklar
+  text_git_repository_note: Depo yalın halde (bare) ve yerel sistemde bulunuyor. (örn. /gitrepo, c:\gitrepo)
+  description_query_sort_criteria_direction: Sıralama yönü
+  description_project_scope: Arama kapsamı
+  description_filter: Süzgeç
+  description_user_mail_notification: E-posta bildirim ayarları
+  description_date_from: Başlangıç tarihini gir
+  description_message_content: Mesaj içeriği
+  description_available_columns: Kullanılabilir Sütunlar
+  description_date_range_interval: Başlangıç ve bitiş tarihini seçerek tarih aralığını belirleyin
+  description_issue_category_reassign: İş kategorisini seçin
+  description_search: Arama alanı
+  description_notes: Notlar
+  description_date_range_list: Listeden tarih aralığını seçin
+  description_choose_project: Projeler
+  description_date_to: Bitiş tarihini gir
+  description_query_sort_criteria_attribute: Sıralama ölçütü
+  description_wiki_subpages_reassign: Yeni üst sayfa seç
+  description_selected_columns: Seçilmiş Sütunlar
+  label_parent_revision: Üst
+  label_child_revision: Alt
+  error_scm_annotate_big_text_file: Girdi maksimum metin dosyası boyutundan büyük olduğu için ek açıklama girilemiyor.
+  setting_default_issue_start_date_to_creation_date: Geçerli tarihi yeni işler için başlangıç tarihi olarak kullan
+  button_edit_section: Bölümü düzenle
+  setting_repositories_encodings: Eklerin ve depoların kodlamaları
+  description_all_columns: Tüm sütunlar
+  button_export: Dışarı aktar
+  label_export_options: "%{export_format} dışa aktarım seçenekleri"
+  error_attachment_too_big: İzin verilen maksimum dosya boyutunu (%{max_size}) aştığı için dosya yüklenemedi.
+  notice_failed_to_save_time_entries: "Seçilen %{total} adet zaman girdisinden %{count} tanesi kaydedilemedi: %{ids}."
   label_x_issues:
     zero:  0 İş
     one:   1 İş
     other: "%{count} İşler"
-  label_repository_new: New repository
-  field_repository_is_default: Main repository
-  label_copy_attachments: Copy attachments
+  label_repository_new: Yeni depo
+  field_repository_is_default: Ana depo
+  label_copy_attachments: Ekleri kopyala
   label_item_position: "%{position}/%{count}"
-  label_completed_versions: Completed versions
-  text_project_identifier_info: Only lower case letters (a-z), numbers, dashes and underscores are allowed.<br />Once saved, the identifier cannot be changed.
-  field_multiple: Multiple values
-  setting_commit_cross_project_ref: Allow issues of all the other projects to be referenced and fixed
-  text_issue_conflict_resolution_add_notes: Add my notes and discard my other changes
-  text_issue_conflict_resolution_overwrite: Apply my changes anyway (previous notes will be kept but some changes may be overwritten)
-  notice_issue_update_conflict: The issue has been updated by an other user while you were editing it.
-  text_issue_conflict_resolution_cancel: Discard all my changes and redisplay %{link}
-  permission_manage_related_issues: Manage related issues
-  field_ldap_filter: LDAP filter
-  label_search_for_watchers: Search for watchers to add
-  notice_account_deleted: Your account has been permanently deleted.
-  setting_unsubscribe: Allow users to delete their own account
-  button_delete_my_account: Delete my account
+  label_completed_versions: Tamamlanmış sürümler
+  text_project_identifier_info: Yalnızca küçük harfler (a-z), sayılar, tire ve alt tire kullanılabilir.<br />Kaydedilen tanımlayıcı daha sonra değiştirilemez.
+  field_multiple: Çoklu değer
+  setting_commit_cross_project_ref: Diğer bütün projelerdeki iş kayıtlarının kaynak gösterilmesine ve kayıtların kapatılabilmesine izin ver
+  text_issue_conflict_resolution_add_notes: Notlarımı ekle ve diğer değişikliklerimi iptal et
+  text_issue_conflict_resolution_overwrite: Değişikliklerimi yine de uygula (önceki notlar saklanacak ancak bazı değişikliklerin üzerine yazılabilir)
+  notice_issue_update_conflict: Düzenleme yaparken başka bir kullanıcı tarafından sorun güncellendi.
+  text_issue_conflict_resolution_cancel: Tüm değişiklikleri iptal et ve yeniden görüntüle %{link}
+  permission_manage_related_issues: Benzer sorunları yönet
+  field_auth_source_ldap_filter: LDAP süzgeçi
+  label_search_for_watchers: Takipçi eklemek için ara
+  notice_account_deleted: Hesabınız kalıcı olarak silinmiştir.
+  setting_unsubscribe: Kullanıcıların kendi hesaplarını silebilmesine izin ver
+  button_delete_my_account: Hesabımı sil
   text_account_destroy_confirmation: |-
-    Are you sure you want to proceed?
-    Your account will be permanently deleted, with no way to reactivate it.
+    Devam etmek istediğinize emin misiniz?
+    Hesabınız tekrar açılmamak üzere kalıcı olarak silinecektir.
+  error_session_expired: Oturum zaman aşımına uğradı. Lütfen tekrar giriş yapın.
+  text_session_expiration_settings: "Uyarı: Bu ayarları değiştirmek (sizinki de dahil) tüm oturumları sonlandırabilir."
+  setting_session_lifetime: Maksimum oturum süresi
+  setting_session_timeout: Maksimum hareketsizlik zaman aşımı
+  label_session_expiration: Oturum süre sonu
+  permission_close_project: Projeyi kapat/yeniden aç
+  label_show_closed_projects: Kapatılmış projeleri göster
+  button_close: Kapat
+  button_reopen: Yeniden aç
+  project_status_active: etkin
+  project_status_closed: kapalı
+  project_status_archived: arşivlenmiş
+  text_project_closed: Proje kapatıldı ve artık değiştirilemez.
+  notice_user_successful_create: Kullanıcı %{id} yaratıldı.
+  field_core_fields: Standart alanlar
+  field_timeout: Zaman aşımı (saniye olarak)
+  setting_thumbnails_enabled: Küçük resmi görüntüle
+  setting_thumbnails_size: Küçük resim boyutu (pixel olarak)
+  label_status_transitions: Durum değiştirme
+  label_fields_permissions: Alan izinleri
+  label_readonly: Salt okunur
+  label_required: Zorunlu
+  text_repository_identifier_info: Yalnızca küçük harfler (a-z), sayılar, tire ve alt tire kullanılabilir.<br />Kaydedilen tanımlayıcı daha sonra değiştirilemez.
+  field_board_parent: Üst forum
+  label_attribute_of_project: Proje %{name}
+  label_attribute_of_author: Yazar %{name}
+  label_attribute_of_assigned_to: Atanan %{name}
+  label_attribute_of_fixed_version: Hedef sürüm %{name}
+  label_copy_subtasks: Alt görevi kopyala
+  label_copied_to: Kopyalama hedefi
+  label_copied_from: Kopyalanacak kaynak
+  label_any_issues_in_project: projedeki herhangi bir sorun
+  label_any_issues_not_in_project: projede olmayan herhangi bir sorun
+  field_private_notes: Özel notlar
+  permission_view_private_notes: Özel notları görüntüle
+  permission_set_notes_private: Notları özel olarak işaretle
+  label_no_issues_in_project: projede hiçbir sorun yok
+  label_any: Hepsi
+  label_last_n_weeks: son %{count} hafta
+  setting_cross_project_subtasks: Projeler arası alt işlere izin ver
+  label_cross_project_descendants: Alt projeler ile
+  label_cross_project_tree: Proje ağacı ile
+  label_cross_project_hierarchy: Proje hiyerarşisi ile
+  label_cross_project_system: Tüm projeler ile
+  button_hide: Gizle
+  setting_non_working_week_days: Tatil günleri
+  label_in_the_next_days: gelecekte
+  label_in_the_past_days: geçmişte
+  label_attribute_of_user: Kullanıcı %{name}
+  text_turning_multiple_off: Çoklu değer seçimini devre dışı bırakırsanız, çoklu değer içeren alanlar, her alan için yalnızca tek değer girilecek şekilde düzenlenecektir.
+  label_attribute_of_issue: Sorun %{name}
+  permission_add_documents: Belgeleri ekle
+  permission_edit_documents: Belgeleri düzenle
+  permission_delete_documents: Belgeleri sil
+  label_gantt_progress_line: İlerleme çizgisi
+  setting_jsonp_enabled: JSONP desteğini etkinleştir
+  field_inherit_members: Devralan kullanıcılar
+  field_closed_on: Kapanış tarihi
+  field_generate_password: Parola oluştur
+  setting_default_projects_tracker_ids: Yeni projeler için varsayılan iş tipi
+  label_total_time: Toplam
+  text_scm_config: config/configuration.yml içinden SCM  komutlarını yapılandırabilirsiniz. Lütfen yapılandırmadan sonra uygulamayı tekrar başlatın.
+  text_scm_command_not_available: SCM komutu kullanılamıyor. Lütfen yönetim panelinden ayarları kontrol edin.
+  notice_account_not_activated_yet: Hesabınız henüz etkinleştirilmedi. Yeni bir hesap etkinleştirme e-postası istiyorsanız, lütfen <a href="%{url}">buraya tıklayınız</a>..
+  notice_account_locked: Hesabınız kilitlendi.
+  label_hidden: Gizle
+  label_visibility_private: yalnız benim için
+  label_visibility_roles: yalnız bu roller için
+  label_visibility_public: herhangi bir kullanıcı için
+  field_must_change_passwd: Bir sonraki girişinizde şifrenizi değiştirmeniz gerekir.
+  notice_new_password_must_be_different: Yeni parola geçerli paroladan
+    farklı olmalı
+  setting_mail_handler_excluded_filenames: Dosya adı belirtilen ekleri hariç tut
+  text_convert_available: ImageMagick dönüştürmesi kullanılabilir (isteğe bağlı)

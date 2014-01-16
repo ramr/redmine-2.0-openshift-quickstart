@@ -2,6 +2,8 @@
 # by Vladimir Medarović (vlada@medarovic.com)
 sr-YU:
   direction: ltr
+  jquery:
+    locale: "sr"
   date:
     formats:
       # Use the strftime parameters for formats.
@@ -50,6 +52,9 @@ sr-YU:
       about_x_hours:
         one:   "približno jedan sat"
         other: "približno %{count} sati"
+      x_hours:
+        one:   "1 sat"
+        other: "%{count} sati"
       x_days:
         one:   "jedan dan"
         other: "%{count} dana"
@@ -127,6 +132,7 @@ sr-YU:
         not_same_project: "ne pripada istom projektu"
         circular_dependency: "Ova veza će stvoriti kružnu referencu"
         cant_link_an_issue_with_a_descendant: "Problem ne može biti povezan sa jednim od svojih podzadataka"
+        earlier_than_minimum_start_date: "cannot be earlier than %{date} because of preceding issues"
 
   actionview_instancetag_blank_option: Molim odaberite
 
@@ -134,7 +140,7 @@ sr-YU:
   general_text_Yes: 'Da'
   general_text_no: 'ne'
   general_text_yes: 'da'
-  general_lang_name: 'Srpski'
+  general_lang_name: 'Serbian (Srpski)'
   general_csv_separator: ','
   general_csv_decimal_separator: '.'
   general_csv_encoding: UTF-8
@@ -159,7 +165,7 @@ sr-YU:
   notice_not_authorized: Niste ovlašćeni za pristup ovoj strani.
   notice_email_sent: "E-poruka je poslata na %{value}"
   notice_email_error: "Dogodila se greška prilikom slanja e-poruke (%{value})"
-  notice_feeds_access_key_reseted: Vaš RSS pristupni ključ je poništen.
+  notice_feeds_access_key_reseted: Vaš Atom pristupni ključ je poništen.
   notice_api_access_key_reseted: Vaš API pristupni ključ je poništen.
   notice_failed_to_save_issues: "Neuspešno snimanje %{count} problema od %{total} odabranih: %{ids}."
   notice_failed_to_save_members: "Neuspešno snimanje člana(ova): %{errors}."
@@ -204,8 +210,6 @@ sr-YU:
   mail_subject_wiki_content_updated: "Wiki stranica '%{id}' je ažurirana"
   mail_body_wiki_content_updated: "%{author} je ažurirao wiki stranicu '%{id}'."
 
-  gui_validation_error: jedna greška
-  gui_validation_error_plural: "%{count} grešaka"
 
   field_name: Naziv
   field_description: Opis
@@ -285,7 +289,7 @@ sr-YU:
   field_delay: Kašnjenje
   field_assignable: Problem može biti dodeljen ovoj ulozi
   field_redirect_existing_links: Preusmeri postojeće veze
-  field_estimated_hours: Proteklo vreme
+  field_estimated_hours: Procenjeno vreme 
   field_column_names: Kolone
   field_time_zone: Vremenska zona
   field_searchable: Može da se pretražuje
@@ -382,7 +386,6 @@ sr-YU:
   permission_edit_own_time_entries: Izmena sopstvenog utrošenog vremena
   permission_manage_news: Upravljanje vestima
   permission_comment_news: Komentarisanje vesti
-  permission_manage_documents: Upravljanje dokumentima
   permission_view_documents: Pregledanje dokumenata
   permission_manage_files: Upravljanje datotekama
   permission_view_files: Pregledanje datoteka
@@ -505,8 +508,6 @@ sr-YU:
   label_text: Dugi tekst
   label_attribute: Osobina
   label_attribute_plural: Osobine
-  label_download: "%{count} preuzimanje"
-  label_download_plural: "%{count} preuzimanja"
   label_no_data: Nema podataka za prikazivanje
   label_change_status: Promena statusa
   label_history: Istorija
@@ -609,8 +610,6 @@ sr-YU:
   label_repository: Spremište
   label_repository_plural: Spremišta
   label_browse: Pregledanje
-  label_modification: "%{count} promena"
-  label_modification_plural: "%{count} promena"
   label_branch: Grana
   label_tag: Oznaka
   label_revision: Revizija
@@ -706,9 +705,9 @@ sr-YU:
   label_language_based: Bazirano na jeziku korisnika
   label_sort_by: "Sortirano po %{value}"
   label_send_test_email: Slanje probne e-poruke
-  label_feeds_access_key: RSS pristupni ključ
-  label_missing_feeds_access_key: RSS pristupni ključ nedostaje
-  label_feeds_access_key_created_on: "RSS pristupni ključ je napravljen pre %{value}"
+  label_feeds_access_key: Atom pristupni ključ
+  label_missing_feeds_access_key: Atom pristupni ključ nedostaje
+  label_feeds_access_key_created_on: "Atom pristupni ključ je napravljen pre %{value}"
   label_module_plural: Moduli
   label_added_time_by: "Dodao %{author} pre %{age}"
   label_updated_time_by: "Ažurirao %{author} pre %{age}"
@@ -917,49 +916,48 @@ sr-YU:
   project_module_gantt: Gantov dijagram
   project_module_calendar: Kalendar
   button_edit_associated_wikipage: "Edit associated Wiki page: %{page_title}"
-  text_are_you_sure_with_children: Delete issue and all child issues?
   field_text: Text field
-  label_user_mail_option_only_owner: Only for things I am the owner of
-  setting_default_notification_option: Default notification option
-  label_user_mail_option_only_my_events: Only for things I watch or I'm involved in
-  label_user_mail_option_only_assigned: Only for things I am assigned to
-  label_user_mail_option_none: No events
+  label_user_mail_option_only_owner: Samo za stvari koje posedujem
+  setting_default_notification_option: Podrazumevana opcija za notifikaciju
+  label_user_mail_option_only_my_events: Za dogadjaje koje pratim ili sam u njih uključen
+  label_user_mail_option_only_assigned: Za dogadjaje koji su mi dodeljeni lično
+  label_user_mail_option_none: Bez obaveštenja
   field_member_of_group: Assignee's group
   field_assigned_to_role: Assignee's role
-  notice_not_authorized_archived_project: The project you're trying to access has been archived.
-  label_principal_search: "Search for user or group:"
-  label_user_search: "Search for user:"
-  field_visible: Visible
-  setting_emails_header: Emails header
+  notice_not_authorized_archived_project: Projekat kome pokušavate da pristupite je arhiviran
+  label_principal_search: "Traži korisnike ili grupe:"
+  label_user_search: "Traži korisnike:"
+  field_visible: Vidljivo
+  setting_emails_header: Email zaglavlje
   setting_commit_logtime_activity_id: Activity for logged time
   text_time_logged_by_changeset: Applied in changeset %{value}.
-  setting_commit_logtime_enabled: Enable time logging
+  setting_commit_logtime_enabled: Omogući praćenje vremena
   notice_gantt_chart_truncated: The chart was truncated because it exceeds the maximum number of items that can be displayed (%{max})
-  setting_gantt_items_limit: Maximum number of items displayed on the gantt chart
-  field_warn_on_leaving_unsaved: Warn me when leaving a page with unsaved text
-  text_warn_on_leaving_unsaved: The current page contains unsaved text that will be lost if you leave this page.
+  setting_gantt_items_limit: Maksimalan broj stavki na gant grafiku
+  field_warn_on_leaving_unsaved: Upozori me ako napuštam stranu sa tekstom koji nije snimljen
+  text_warn_on_leaving_unsaved: Strana sadrži tekst koji nije snimljen i biće izgubljen ako je napustite.
   label_my_queries: My custom queries
-  text_journal_changed_no_detail: "%{label} updated"
-  label_news_comment_added: Comment added to a news
-  button_expand_all: Expand all
-  button_collapse_all: Collapse all
+  text_journal_changed_no_detail: "%{label} ažuriran"
+  label_news_comment_added: Komentar dodat u novosti
+  button_expand_all: Proširi sve
+  button_collapse_all: Zatvori sve
   label_additional_workflow_transitions_for_assignee: Additional transitions allowed when the user is the assignee
   label_additional_workflow_transitions_for_author: Additional transitions allowed when the user is the author
   label_bulk_edit_selected_time_entries: Bulk edit selected time entries
-  text_time_entries_destroy_confirmation: Are you sure you want to delete the selected time entr(y/ies)?
-  label_role_anonymous: Anonymous
-  label_role_non_member: Non member
-  label_issue_note_added: Note added
-  label_issue_status_updated: Status updated
-  label_issue_priority_updated: Priority updated
-  label_issues_visibility_own: Issues created by or assigned to the user
-  field_issues_visibility: Issues visibility
-  label_issues_visibility_all: All issues
-  permission_set_own_issues_private: Set own issues public or private
-  field_is_private: Private
-  permission_set_issues_private: Set issues public or private
-  label_issues_visibility_public: All non private issues
-  text_issues_destroy_descendants_confirmation: This will also delete %{count} subtask(s).
+  text_time_entries_destroy_confirmation: Da li ste sigurni da želite da obrišete selektovane stavke ?
+  label_role_anonymous: Anonimus
+  label_role_non_member: Nije član
+  label_issue_note_added: Nota dodana
+  label_issue_status_updated: Status ažuriran
+  label_issue_priority_updated: Prioritet ažuriran
+  label_issues_visibility_own: Problem kreiran od strane ili je dodeljen korisniku
+  field_issues_visibility: Vidljivost problema
+  label_issues_visibility_all: Svi problemi
+  permission_set_own_issues_private: Podesi sopstveni problem kao privatan ili javan
+  field_is_private: Privatno
+  permission_set_issues_private: Podesi problem kao privatan ili javan
+  label_issues_visibility_public: Svi javni problemi
+  text_issues_destroy_descendants_confirmation: Ova operacija će takođe obrisati  %{count} podzadataka.
   field_commit_logs_encoding: Kodiranje izvršnih poruka
   field_scm_path_encoding: Path encoding
   text_scm_path_encoding_note: "Default: UTF-8"
@@ -971,8 +969,6 @@ sr-YU:
   text_scm_command: Command
   text_scm_command_version: Version
   label_git_report_last_commit: Report last commit for files and directories
-  text_scm_config: You can configure your scm commands in config/configuration.yml. Please restart the application after editing it.
-  text_scm_command_not_available: Scm command is not available. Please check settings on the administration panel.
   notice_issue_successful_create: Issue %{id} created.
   label_between: between
   setting_issue_group_assignment: Allow issue assignment to groups
@@ -1023,7 +1019,7 @@ sr-YU:
   notice_issue_update_conflict: The issue has been updated by an other user while you were editing it.
   text_issue_conflict_resolution_cancel: Discard all my changes and redisplay %{link}
   permission_manage_related_issues: Manage related issues
-  field_ldap_filter: LDAP filter
+  field_auth_source_ldap_filter: LDAP filter
   label_search_for_watchers: Search for watchers to add
   notice_account_deleted: Your account has been permanently deleted.
   setting_unsubscribe: Allow users to delete their own account
@@ -1031,3 +1027,79 @@ sr-YU:
   text_account_destroy_confirmation: |-
     Are you sure you want to proceed?
     Your account will be permanently deleted, with no way to reactivate it.
+  error_session_expired: Your session has expired. Please login again.
+  text_session_expiration_settings: "Warning: changing these settings may expire the current sessions including yours."
+  setting_session_lifetime: Session maximum lifetime
+  setting_session_timeout: Session inactivity timeout
+  label_session_expiration: Session expiration
+  permission_close_project: Close / reopen the project
+  label_show_closed_projects: View closed projects
+  button_close: Close
+  button_reopen: Reopen
+  project_status_active: active
+  project_status_closed: closed
+  project_status_archived: archived
+  text_project_closed: This project is closed and read-only.
+  notice_user_successful_create: User %{id} created.
+  field_core_fields: Standard fields
+  field_timeout: Timeout (in seconds)
+  setting_thumbnails_enabled: Display attachment thumbnails
+  setting_thumbnails_size: Thumbnails size (in pixels)
+  label_status_transitions: Status transitions
+  label_fields_permissions: Fields permissions
+  label_readonly: Read-only
+  label_required: Required
+  text_repository_identifier_info: Only lower case letters (a-z), numbers, dashes and underscores are allowed.<br />Once saved, the identifier cannot be changed.
+  field_board_parent: Parent forum
+  label_attribute_of_project: Project's %{name}
+  label_attribute_of_author: Author's %{name}
+  label_attribute_of_assigned_to: Assignee's %{name}
+  label_attribute_of_fixed_version: Target version's %{name}
+  label_copy_subtasks: Copy subtasks
+  label_copied_to: copied to
+  label_copied_from: copied from
+  label_any_issues_in_project: any issues in project
+  label_any_issues_not_in_project: any issues not in project
+  field_private_notes: Private notes
+  permission_view_private_notes: View private notes
+  permission_set_notes_private: Set notes as private
+  label_no_issues_in_project: no issues in project
+  label_any: svi
+  label_last_n_weeks: last %{count} weeks
+  setting_cross_project_subtasks: Allow cross-project subtasks
+  label_cross_project_descendants: Sa potprojektima
+  label_cross_project_tree: Sa stablom projekta
+  label_cross_project_hierarchy: Sa hijerarhijom projekta
+  label_cross_project_system: Sa svim projektima
+  button_hide: Hide
+  setting_non_working_week_days: Non-working days
+  label_in_the_next_days: in the next
+  label_in_the_past_days: in the past
+  label_attribute_of_user: User's %{name}
+  text_turning_multiple_off: If you disable multiple values, multiple values will be
+    removed in order to preserve only one value per item.
+  label_attribute_of_issue: Issue's %{name}
+  permission_add_documents: Add documents
+  permission_edit_documents: Edit documents
+  permission_delete_documents: Delete documents
+  label_gantt_progress_line: Progress line
+  setting_jsonp_enabled: Enable JSONP support
+  field_inherit_members: Inherit members
+  field_closed_on: Closed
+  field_generate_password: Generate password
+  setting_default_projects_tracker_ids: Default trackers for new projects
+  label_total_time: Ukupno
+  text_scm_config: You can configure your SCM commands in config/configuration.yml. Please restart the application after editing it.
+  text_scm_command_not_available: SCM command is not available. Please check settings on the administration panel.
+  notice_account_not_activated_yet: You haven't activated your account yet. If you want
+    to receive a new activation email, please <a href="%{url}">click this link</a>.
+  notice_account_locked: Your account is locked.
+  label_hidden: Hidden
+  label_visibility_private: to me only
+  label_visibility_roles: to these roles only
+  label_visibility_public: to any users
+  field_must_change_passwd: Must change password at next logon
+  notice_new_password_must_be_different: The new password must be different from the
+    current password
+  setting_mail_handler_excluded_filenames: Exclude attachments by name
+  text_convert_available: ImageMagick convert available (optional)

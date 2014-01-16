@@ -1,6 +1,6 @@
 Redmine on OpenShift
 =========================
- 
+
 Redmine is a flexible project management web application. Written using Ruby on Rails framework, it is cross-platform and cross-database.
 
 Redmine is open source and released under the terms of the GNU General Public License v2 (GPL).
@@ -16,7 +16,7 @@ Create a ruby application (ruby-1.8 or ruby-1.9)
 	rhc app create -a redmine -t ruby-1.9  # or ruby-1.8
 
 Add mysql support to your application
-    
+
 	rhc cartridge add -a redmine -c mysql-5.1
 
 Make a note of the username, password, and host name as you will need to use these to login to the mysql database
@@ -24,7 +24,7 @@ Make a note of the username, password, and host name as you will need to use the
 Add this upstream Redmine quickstart repo
 
 	cd redmine
-	git remote add upstream -m master git://github.com/openshift/redmine-2.0-openshift-quickstart.git
+	git remote add upstream -m master git://github.com/openshift-quickstart/redmine-openshift-quickstart.git
 	git pull -s recursive -X theirs upstream master
 
 Then push the repo upstream
@@ -48,3 +48,7 @@ Once your installation is complete, it is highly recommended that you change
 the password for the Redmine admin user - see the Change password link at:
 
 	http://redmine-$yournamespace.rhcloud.com/my/account
+
+Version
+-----------------------------------
+Redmine 2.4

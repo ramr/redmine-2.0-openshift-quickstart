@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,35 +17,30 @@
 
 require File.expand_path('../../../test_helper', __FILE__)
 
-class ApiTest::IssueStatusesTest < ActionController::IntegrationTest
+class Redmine::ApiTest::IssueStatusesTest < Redmine::ApiTest::Base
   fixtures :issue_statuses
 
   def setup
     Setting.rest_api_enabled = '1'
   end
 
-  context "/issue_statuses" do
-    context "GET" do
+  test "GET /issue_statuses.xml should return issue statuses" do
+    get '/issue_statuses.xml'
 
-      should "return issue statuses" do
-        get '/issue_statuses.xml'
-
-        assert_response :success
-        assert_equal 'application/xml', @response.content_type
-        assert_tag :tag => 'issue_statuses',
-          :attributes => {:type => 'array'},
-          :child => {
-            :tag => 'issue_status',
-            :child => {
-              :tag => 'id',
-              :content => '2',
-              :sibling => {
-                :tag => 'name',
-                :content => 'Assigned'
-              }
-            }
+    assert_response :success
+    assert_equal 'application/xml', @response.content_type
+    assert_tag :tag => 'issue_statuses',
+      :attributes => {:type => 'array'},
+      :child => {
+        :tag => 'issue_status',
+        :child => {
+          :tag => 'id',
+          :content => '2',
+          :sibling => {
+            :tag => 'name',
+            :content => 'Assigned'
           }
-      end
-    end
+        }
+      }
   end
 end

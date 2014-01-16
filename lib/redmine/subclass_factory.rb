@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -22,8 +22,7 @@ module Redmine
     end 
 
     module ClassMethods
-      # Returns an instance of the given subclass name
-      def new_subclass_instance(class_name, *args)
+      def get_subclass(class_name)
         klass = nil
         begin
           klass = class_name.to_s.classify.constantize
@@ -33,6 +32,12 @@ module Redmine
         unless subclasses.include? klass
           klass = nil
         end
+        klass
+      end
+
+      # Returns an instance of the given subclass name
+      def new_subclass_instance(class_name, *args)
+        klass = get_subclass(class_name)
         if klass
           klass.new(*args)
         end

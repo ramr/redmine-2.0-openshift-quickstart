@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -76,12 +76,12 @@ class Repository::Mercurial < Repository
     return nil if name.blank?
     s = name.to_s
     if /[^\d]/ =~ s or s.size > 8
-      e = changesets.find(:first, :conditions => ['scmid = ?', s])
+      cs = changesets.where(:scmid => s).first
     else
-      e = changesets.find(:first, :conditions => ['revision = ?', s])
+      cs = changesets.where(:revision => s).first
     end
-    return e if e
-    changesets.find(:first, :conditions => ['scmid LIKE ?', "#{s}%"])  # last ditch
+    return cs if cs
+    changesets.where('scmid LIKE ?', "#{s}%").first
   end
 
   # Returns the latest changesets for +path+; sorted by revision number
@@ -92,11 +92,12 @@ class Repository::Mercurial < Repository
   # Sqlite3 and PostgreSQL pass.
   # Is this MySQL bug?
   def latest_changesets(path, rev, limit=10)
-    changesets.find(:all,
-                    :include    => :user,
-                    :conditions => latest_changesets_cond(path, rev, limit),
-                    :limit      => limit,
-                    :order      => "#{Changeset.table_name}.id DESC")
+    changesets.
+      includes(:user).
+      where(latest_changesets_cond(path, rev, limit)).
+      limit(limit).
+      order("#{Changeset.table_name}.id DESC").
+      all
   end
 
   def latest_changesets_cond(path, rev, limit)

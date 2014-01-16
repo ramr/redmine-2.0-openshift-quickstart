@@ -31,14 +31,14 @@
 #
 #============================================================+
 
+require 'tempfile'
+require 'core/rmagick'
+
 #
 # TCPDF Class.
 # @package com.tecnick.tcpdf
 #
  
-@@version = "1.53.0.TC031"
-@@fpdf_charwidths = {}
-
 PDF_PRODUCER = 'TCPDF via RFPDF 1.53.0.TC031 (http://tcpdf.sourceforge.net)'
 
 module TCPDFFontDescriptor
@@ -76,6 +76,9 @@ class TCPDF
     Rails.logger
   end
 
+  @@version = "1.53.0.TC031"
+  @@fpdf_charwidths = {}
+
   cattr_accessor :k_cell_height_ratio
   @@k_cell_height_ratio = 1.25
 
@@ -91,8 +94,6 @@ class TCPDF
   cattr_accessor :k_path_url_cache
   @@k_path_url_cache = Rails.root.join('tmp')
   
-  cattr_accessor :decoder
-		
 	attr_accessor :barcode
 	
 	attr_accessor :buffer
@@ -219,12 +220,6 @@ class TCPDF
 			
 		#Some checks
 		dochecks();
-		
-		begin	  
-		  @@decoder = HTMLEntities.new 
-		rescue
-		  @@decoder = nil
-		end
 		
 		#Initialization of properties
   	@barcode ||= false
@@ -400,6 +395,9 @@ class TCPDF
 			Error("Incorrect orientation: #{orientation}")
 		end
 
+    @fw = @w_pt/@k
+    @fh = @h_pt/@k
+    
 		@cur_orientation = @def_orientation
 		@w = @w_pt/@k
 		@h = @h_pt/@k
@@ -2060,17 +2058,12 @@ class TCPDF
 			type.downcase!
 			if (type == 'jpg' or type == 'jpeg')
 				info=parsejpg(file);
-			elsif (type == 'png' or type == 'gif')
-				img = Magick::ImageList.new(file)
-				img.format = "PNG"     # convert to PNG from gif 
-				img.opacity = 0        # PNG alpha channel delete
-				File.open( @@k_path_cache + File::basename(file), 'w'){|f|
-					f.binmode
-					f.print img.to_blob
-					f.close
-				}
-				info=parsepng( @@k_path_cache + File::basename(file));
-				File.delete( @@k_path_cache + File::basename(file))
+			elsif (type == 'png')
+				info=parsepng(file);
+			elsif (type == 'gif')
+			  tmpFile = imageToPNG(file);
+				info=parsepng(tmpFile.path);
+				tmpFile.delete
 			else
 				#Allow for additional formats
 				mtd='parse' + type;
@@ -2438,7 +2431,7 @@ class TCPDF
 		out('1 0 obj');
 		out('<</Type /Pages');
 		kids='/Kids [';
-		0.upto(nb) do |i|
+		0.upto(nb - 1) do |i|
 			kids<<(3+2*i).to_s + ' 0 R ';
 		end
 		out(kids + ']');
@@ -2636,7 +2629,7 @@ class TCPDF
 			if (!info['trns'].nil? and info['trns'].kind_of?(Array))
 				trns='';
 				0.upto(info['trns'].length) do |i|
-					trns << info['trns'][i] + ' ' + info['trns'][i] + ' ';
+					trns << ("#{info['trns'][i]} " * 2);
 				end
 				out('/Mask [' + trns + ']');
 			end
@@ -2893,12 +2886,27 @@ class TCPDF
 		#Read whole file
 		data='';
 
-		open( @@k_path_cache + File::basename(file),'rb') do |f|
+		open(file,'rb') do |f|
 			data<<f.read();
 		end
-		File.delete( @@k_path_cache + File::basename(file))
 
 		return {'w' => a[0],'h' => a[1],'cs' => colspace,'bpc' => bpc,'f'=>'DCTDecode','data' => data}
+	end
+
+	def imageToPNG(file)
+		return unless Object.const_defined?(:Magick)
+
+		img = Magick::ImageList.new(file)
+		img.format = 'PNG'	 # convert to PNG from gif 
+		img.opacity = 0			 # PNG alpha channel delete
+
+		#use a temporary file....
+		tmpFile = Tempfile.new(['', '_' + File::basename(file) + '.png'], @@k_path_cache);
+		tmpFile.binmode
+		tmpFile.print img.to_blob
+		tmpFile
+	ensure
+		tmpFile.close
 	end
 
 	#
@@ -2962,8 +2970,8 @@ class TCPDF
 				elsif (ct==2)
 					trns = t[[1].unpack('C')[0], t[3].unpack('C')[0], t[5].unpack('C')[0]]
 				else
-					pos=t.include?(0.chr);
-					if (pos!=false)
+					pos=t.index(0.chr);
+					unless (pos.nil?)
 						trns = [pos]
 					end
 				end
@@ -2981,8 +2989,9 @@ class TCPDF
 		if (colspace=='Indexed' and pal.empty?)
 			Error('Missing palette in ' + file);
 		end
-		f.close
 		return {'w' => w, 'h' => h, 'cs' => colspace, 'bpc' => bpc, 'f'=>'FlateDecode', 'parms' => parms, 'pal' => pal, 'trns' => trns, 'data' => data}
+	ensure
+		f.close
 	end
 
 	#
@@ -3094,7 +3103,7 @@ class TCPDF
 		# is a stream object that contains the definition of the CMap
 		# (PDF Reference 1.3 chap. 5.9)
 		newobj();
-		out('<</Length 383>>');
+		out('<</Length 345>>')
 		out('stream');
 		out('/CIDInit /ProcSet findresource begin');
 		out('12 dict begin');
@@ -3601,9 +3610,9 @@ class TCPDF
 		restspace = GetPageHeight() - GetY() - GetBreakMargin();
 		
 		writeHTML(html, true, fill); # write html text
+    SetX(x)
 		
 		currentY =  GetY();
-		
 		@auto_page_break = false;
 		# check if a new page has been created
 		if (@page > pagenum)
@@ -3611,11 +3620,13 @@ class TCPDF
 			currentpage = @page;
 			@page = pagenum;
 			SetY(GetPageHeight() - restspace - GetBreakMargin());
+      SetX(x)
 			Cell(w, restspace - 1, "", b, 0, 'L', 0);
 			b = b2;
 			@page += 1;
 			while @page < currentpage
 				SetY(@t_margin); # put cursor at the beginning of text
+        SetX(x)
 				Cell(w, @page_break_trigger - @t_margin, "", b, 0, 'L', 0);
 				@page += 1;
 			end
@@ -3624,10 +3635,12 @@ class TCPDF
 			end
 			# design a cell around the text on last page
 			SetY(@t_margin); # put cursor at the beginning of text
+      SetX(x)
 			Cell(w, currentY - @t_margin, "", b, 0, 'L', 0);
 		else
 			SetY(y); # put cursor at the beginning of text
 			# design a cell around the text
+      SetX(x)
 			Cell(w, [h, (currentY - y)].max, "", border, 0, 'L', 0);
 		end
 		@auto_page_break = true;
@@ -3937,9 +3950,6 @@ class TCPDF
 					rescue => err
 						logger.error "pdf: Image: error: #{err.message}"
 						Write(@lasth, attrs['src'], '', fill);
-						if File.file?( @@k_path_cache + File::basename(file))
-							File.delete( @@k_path_cache + File::basename(file))
-						end
 					end
 				end
 				
@@ -3984,6 +3994,10 @@ class TCPDF
 				@quote_page[@quote_count] = @page;
 				@quote_count += 1
 			when 'br'
+				if @tdbegin
+					@tdtext << "\n"
+					return
+				end
 				Ln();
 
 				if (@li_spacer.length > 0)
@@ -4322,11 +4336,7 @@ class TCPDF
 	# @return string converted
 	#
 	def unhtmlentities(string)
-	  if @@decoder.nil?
       CGI.unescapeHTML(string)
-    else
-  	  @@decoder.decode(string)
-    end
   end
   
 end # END OF CLASS

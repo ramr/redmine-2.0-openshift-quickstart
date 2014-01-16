@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,28 +18,35 @@
 class Principal < ActiveRecord::Base
   self.table_name = "#{table_name_prefix}users#{table_name_suffix}"
 
+  # Account statuses
+  STATUS_ANONYMOUS  = 0
+  STATUS_ACTIVE     = 1
+  STATUS_REGISTERED = 2
+  STATUS_LOCKED     = 3
+
   has_many :members, :foreign_key => 'user_id', :dependent => :destroy
-  has_many :memberships, :class_name => 'Member', :foreign_key => 'user_id', :include => [ :project, :roles ], :conditions => "#{Project.table_name}.status=#{Project::STATUS_ACTIVE}", :order => "#{Project.table_name}.name"
+  has_many :memberships, :class_name => 'Member', :foreign_key => 'user_id', :include => [ :project, :roles ], :conditions => "#{Project.table_name}.status<>#{Project::STATUS_ARCHIVED}", :order => "#{Project.table_name}.name"
   has_many :projects, :through => :memberships
   has_many :issue_categories, :foreign_key => 'assigned_to_id', :dependent => :nullify
 
   # Groups and active users
-  scope :active, :conditions => "#{Principal.table_name}.status = 1"
+  scope :active, lambda { where(:status => STATUS_ACTIVE) }
 
   scope :like, lambda {|q|
+    q = q.to_s
     if q.blank?
-      {}
+      where({})
     else
-      q = q.to_s.downcase
       pattern = "%#{q}%"
-      sql = "LOWER(login) LIKE :p OR LOWER(firstname) LIKE :p OR LOWER(lastname) LIKE :p OR LOWER(mail) LIKE :p"
+      sql = %w(login firstname lastname mail).map {|column| "LOWER(#{table_name}.#{column}) LIKE LOWER(:p)"}.join(" OR ")
       params = {:p => pattern}
       if q =~ /^(.+)\s+(.+)$/
         a, b = "#{$1}%", "#{$2}%"
-        sql << " OR (LOWER(firstname) LIKE :a AND LOWER(lastname) LIKE :b) OR (LOWER(firstname) LIKE :b AND LOWER(lastname) LIKE :a)"
+        sql << " OR (LOWER(#{table_name}.firstname) LIKE LOWER(:a) AND LOWER(#{table_name}.lastname) LIKE LOWER(:b))"
+        sql << " OR (LOWER(#{table_name}.firstname) LIKE LOWER(:b) AND LOWER(#{table_name}.lastname) LIKE LOWER(:a))"
         params.merge!(:a => a, :b => b)
       end
-      {:conditions => [sql, params]}
+      where(sql, params)
     end
   }
 
@@ -47,22 +54,23 @@ class Principal < ActiveRecord::Base
   scope :member_of, lambda {|projects|
     projects = [projects] unless projects.is_a?(Array)
     if projects.empty?
-      {:conditions => "1=0"}
+      where("1=0")
     else
       ids = projects.map(&:id)
-      {:conditions => ["#{Principal.table_name}.status = 1 AND #{Principal.table_name}.id IN (SELECT DISTINCT user_id FROM #{Member.table_name} WHERE project_id IN (?))", ids]}
+      active.uniq.joins(:members).where("#{Member.table_name}.project_id IN (?)", ids)
     end
   }
   # Principals that are not members of projects
   scope :not_member_of, lambda {|projects|
     projects = [projects] unless projects.is_a?(Array)
     if projects.empty?
-      {:conditions => "1=0"}
+      where("1=0")
     else
       ids = projects.map(&:id)
-      {:conditions => ["#{Principal.table_name}.id NOT IN (SELECT DISTINCT user_id FROM #{Member.table_name} WHERE project_id IN (?))", ids]}
+      where("#{Principal.table_name}.id NOT IN (SELECT DISTINCT user_id FROM #{Member.table_name} WHERE project_id IN (?))", ids)
     end
   }
+  scope :sorted, lambda { order(*Principal.fields_for_order_statement)}
 
   before_create :set_default_empty_values
 
@@ -79,6 +87,15 @@ class Principal < ActiveRecord::Base
       # groups after users
       principal.class.name <=> self.class.name
     end
+  end
+
+  # Returns an array of fields names than can be used to make an order statement for principals.
+  # Users are sorted before Groups.
+  # Examples:
+  def self.fields_for_order_statement(table=nil)
+    table ||= table_name
+    columns = ['type DESC'] + (User.name_formatter[:order] - ['id']) + ['lastname', 'id']
+    columns.uniq.map {|field| "#{table}.#{field}"}
   end
 
   protected

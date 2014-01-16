@@ -1,7 +1,7 @@
 # encoding: utf-8
 #
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -65,7 +65,7 @@ module IssuesHelper
     s = ''
     ancestors = issue.root? ? [] : issue.ancestors.visible.all
     ancestors.each do |ancestor|
-      s << '<div>' + content_tag('p', link_to_issue(ancestor))
+      s << '<div>' + content_tag('p', link_to_issue(ancestor, :project => (issue.project_id != ancestor.project_id)))
     end
     s << '<div>'
     subject = h(issue.subject)
@@ -80,25 +80,93 @@ module IssuesHelper
   def render_descendants_tree(issue)
     s = '<form><table class="list issues">'
     issue_list(issue.descendants.visible.sort_by(&:lft)) do |child, level|
+      css = "issue issue-#{child.id} hascontextmenu"
+      css << " idnt idnt-#{level}" if level > 0
       s << content_tag('tr',
              content_tag('td', check_box_tag("ids[]", child.id, false, :id => nil), :class => 'checkbox') +
-             content_tag('td', link_to_issue(child, :truncate => 60), :class => 'subject') +
+             content_tag('td', link_to_issue(child, :truncate => 60, :project => (issue.project_id != child.project_id)), :class => 'subject') +
              content_tag('td', h(child.status)) +
              content_tag('td', link_to_user(child.assigned_to)) +
              content_tag('td', progress_bar(child.done_ratio, :width => '80px')),
-             :class => "issue issue-#{child.id} hascontextmenu #{level > 0 ? "idnt idnt-#{level}" : nil}")
+             :class => css)
     end
     s << '</table></form>'
     s.html_safe
   end
 
+  # Returns an array of error messages for bulk edited issues
+  def bulk_edit_error_messages(issues)
+    messages = {}
+    issues.each do |issue|
+      issue.errors.full_messages.each do |message|
+        messages[message] ||= []
+        messages[message] << issue
+      end
+    end
+    messages.map { |message, issues|
+      "#{message}: " + issues.map {|i| "##{i.id}"}.join(', ')
+    }
+ end
+
+  # Returns a link for adding a new subtask to the given issue
+  def link_to_new_subtask(issue)
+    attrs = {
+      :tracker_id => issue.tracker,
+      :parent_issue_id => issue
+    }
+    link_to(l(:button_add), new_project_issue_path(issue.project, :issue => attrs))
+  end
+
+  class IssueFieldsRows
+    include ActionView::Helpers::TagHelper
+
+    def initialize
+      @left = []
+      @right = []
+    end
+
+    def left(*args)
+      args.any? ? @left << cells(*args) : @left
+    end
+
+    def right(*args)
+      args.any? ? @right << cells(*args) : @right
+    end
+
+    def size
+      @left.size > @right.size ? @left.size : @right.size
+    end
+
+    def to_html
+      html = ''.html_safe
+      blank = content_tag('th', '') + content_tag('td', '')
+      size.times do |i|
+        left = @left[i] || blank
+        right = @right[i] || blank
+        html << content_tag('tr', left + right)
+      end
+      html
+    end
+
+    def cells(label, text, options={})
+      content_tag('th', "#{label}:", options) + content_tag('td', text, options)
+    end
+  end
+
+  def issue_fields_rows
+    r = IssueFieldsRows.new
+    yield r
+    r.to_html
+  end
+
   def render_custom_fields_rows(issue)
-    return if issue.custom_field_values.empty?
+    values = issue.visible_custom_field_values
+    return if values.empty?
     ordered_values = []
-    half = (issue.custom_field_values.size / 2.0).ceil
+    half = (values.size / 2.0).ceil
     half.times do |i|
-      ordered_values << issue.custom_field_values[i]
-      ordered_values << issue.custom_field_values[i + half]
+      ordered_values << values[i]
+      ordered_values << values[i + half]
     end
     s = "<tr>\n"
     n = 0
@@ -131,34 +199,58 @@ module IssuesHelper
 
   def sidebar_queries
     unless @sidebar_queries
-      @sidebar_queries = Query.visible.all(
-        :order => "#{Query.table_name}.name ASC",
+      @sidebar_queries = IssueQuery.visible.
+        order("#{Query.table_name}.name ASC").
         # Project specific queries and global queries
-        :conditions => (@project.nil? ? ["project_id IS NULL"] : ["project_id IS NULL OR project_id = ?", @project.id])
-      )
+        where(@project.nil? ? ["project_id IS NULL"] : ["project_id IS NULL OR project_id = ?", @project.id]).
+        all
     end
     @sidebar_queries
   end
 
   def query_links(title, queries)
+    return '' if queries.empty?
     # links to #index on issues/show
     url_params = controller_name == 'issues' ? {:controller => 'issues', :action => 'index', :project_id => @project} : params
 
-    content_tag('h3', h(title)) +
-      queries.collect {|query|
-          css = 'query'
-          css << ' selected' if query == @query
-          link_to(h(query.name), url_params.merge(:query_id => query), :class => css)
-        }.join('<br />').html_safe
+    content_tag('h3', title) + "\n" +
+      content_tag('ul',
+        queries.collect {|query|
+            css = 'query'
+            css << ' selected' if query == @query
+            content_tag('li', link_to(query.name, url_params.merge(:query_id => query), :class => css))
+          }.join("\n").html_safe,
+        :class => 'queries'
+      ) + "\n"
   end
 
   def render_sidebar_queries
     out = ''.html_safe
-    queries = sidebar_queries.select {|q| !q.is_public?}
-    out << query_links(l(:label_my_queries), queries) if queries.any?
-    queries = sidebar_queries.select {|q| q.is_public?}
-    out << query_links(l(:label_query_plural), queries) if queries.any?
+    out << query_links(l(:label_my_queries), sidebar_queries.select(&:is_private?))
+    out << query_links(l(:label_query_plural), sidebar_queries.reject(&:is_private?))
     out
+  end
+
+  def email_issue_attributes(issue, user)
+    items = []
+    %w(author status priority assigned_to category fixed_version).each do |attribute|
+      unless issue.disabled_core_fields.include?(attribute+"_id")
+        items << "#{l("field_#{attribute}")}: #{issue.send attribute}"
+      end
+    end
+    issue.visible_custom_field_values(user).each do |value|
+      items << "#{value.custom_field.name}: #{show_value(value)}"
+    end
+    items
+  end
+
+  def render_email_issue_attributes(issue, user, html=false)
+    items = email_issue_attributes(issue, user)
+    if html
+      content_tag('ul', items.map{|s| content_tag('li', s)}.join("\n").html_safe)
+    else
+      items.map{|s| "* #{s}"}.join("\n")
+    end
   end
 
   # Returns the textual representation of a journal details
@@ -169,23 +261,23 @@ module IssuesHelper
     values_by_field = {}
     details.each do |detail|
       if detail.property == 'cf'
-        field_id = detail.prop_key
-        field = CustomField.find_by_id(field_id)
+        field = detail.custom_field
         if field && field.multiple?
-          values_by_field[field_id] ||= {:added => [], :deleted => []}
+          values_by_field[field] ||= {:added => [], :deleted => []}
           if detail.old_value
-            values_by_field[field_id][:deleted] << detail.old_value
+            values_by_field[field][:deleted] << detail.old_value
           end
           if detail.value
-            values_by_field[field_id][:added] << detail.value
+            values_by_field[field][:added] << detail.value
           end
           next
         end
       end
       strings << show_detail(detail, no_html, options)
     end
-    values_by_field.each do |field_id, changes|
-      detail = JournalDetail.new(:property => 'cf', :prop_key => field_id)
+    values_by_field.each do |field, changes|
+      detail = JournalDetail.new(:property => 'cf', :prop_key => field.id.to_s)
+      detail.instance_variable_set "@custom_field", field
       if changes[:added].any?
         detail.value = changes[:added]
         strings << show_detail(detail, no_html, options)
@@ -228,7 +320,7 @@ module IssuesHelper
         old_value = l(detail.old_value == "0" ? :general_text_No : :general_text_Yes) unless detail.old_value.blank?
       end
     when 'cf'
-      custom_field = CustomField.find_by_id(detail.prop_key)
+      custom_field = detail.custom_field
       if custom_field
         multiple = custom_field.multiple?
         label = custom_field.name
@@ -237,6 +329,17 @@ module IssuesHelper
       end
     when 'attachment'
       label = l(:label_attachment)
+    when 'relation'
+      if detail.value && !detail.old_value
+        rel_issue = Issue.visible.find_by_id(detail.value)
+        value = rel_issue.nil? ? "#{l(:label_issue)} ##{detail.value}" :
+                  (no_html ? rel_issue : link_to_issue(rel_issue, :only_path => options[:only_path]))
+      elsif detail.old_value && !detail.value
+        rel_issue = Issue.visible.find_by_id(detail.old_value)
+        old_value = rel_issue.nil? ? "#{l(:label_issue)} ##{detail.old_value}" :
+                          (no_html ? rel_issue : link_to_issue(rel_issue, :only_path => options[:only_path]))
+      end
+      label = l(detail.prop_key.to_sym)
     end
     call_hook(:helper_issues_show_detail_after_setting,
               {:detail => detail, :label => label, :value => value, :old_value => old_value })
@@ -248,7 +351,9 @@ module IssuesHelper
     unless no_html
       label = content_tag('strong', label)
       old_value = content_tag("i", h(old_value)) if detail.old_value
-      old_value = content_tag("strike", old_value) if detail.old_value and detail.value.blank?
+      if detail.old_value && detail.value.blank? && detail.property != 'relation'
+        old_value = content_tag("del", old_value)
+      end
       if detail.property == 'attachment' && !value.blank? && atta = Attachment.find_by_id(detail.prop_key)
         # Link to the attachment if it has not been removed
         value = link_to_attachment(atta, :download => true, :only_path => options[:only_path])
@@ -284,7 +389,7 @@ module IssuesHelper
         else
           l(:text_journal_set_to, :label => label, :value => value).html_safe
         end
-      when 'attachment'
+      when 'attachment', 'relation'
         l(:text_journal_added, :label => label, :value => value).html_safe
       end
     else
@@ -294,10 +399,16 @@ module IssuesHelper
 
   # Find the name of an associated record stored in the field attribute
   def find_name_by_reflection(field, id)
+    unless id.present?
+      return nil
+    end
     association = Issue.reflect_on_association(field.to_sym)
     if association
       record = association.class_name.constantize.find_by_id(id)
-      return record.name if record
+      if record
+        record.name.force_encoding('UTF-8') if record.name.respond_to?(:force_encoding)
+        return record.name
+      end
     end
   end
 
@@ -313,42 +424,5 @@ module IssuesHelper
         end
       end
     end
-  end
-
-  def issues_to_csv(issues, project, query, options={})
-    decimal_separator = l(:general_csv_decimal_separator)
-    encoding = l(:general_csv_encoding)
-    columns = (options[:columns] == 'all' ? query.available_columns : query.columns)
-
-    export = FCSV.generate(:col_sep => l(:general_csv_separator)) do |csv|
-      # csv header fields
-      csv << [ "#" ] + columns.collect {|c| Redmine::CodesetUtil.from_utf8(c.caption.to_s, encoding) } +
-        (options[:description] ? [Redmine::CodesetUtil.from_utf8(l(:field_description), encoding)] : [])
-
-      # csv lines
-      issues.each do |issue|
-        col_values = columns.collect do |column|
-          s = if column.is_a?(QueryCustomFieldColumn)
-            cv = issue.custom_field_values.detect {|v| v.custom_field_id == column.custom_field.id}
-            show_value(cv)
-          else
-            value = column.value(issue)
-            if value.is_a?(Date)
-              format_date(value)
-            elsif value.is_a?(Time)
-              format_time(value)
-            elsif value.is_a?(Float)
-              ("%.2f" % value).gsub('.', decimal_separator)
-            else
-              value
-            end
-          end
-          s.to_s
-        end
-        csv << [ issue.id.to_s ] + col_values.collect {|c| Redmine::CodesetUtil.from_utf8(c.to_s, encoding) } +
-          (options[:description] ? [Redmine::CodesetUtil.from_utf8(issue.description, encoding)] : [])
-      end
-    end
-    export
   end
 end

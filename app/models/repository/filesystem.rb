@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # FileSystem adapter
 # File written by Paul Rivier, at Demotera.
@@ -42,10 +42,6 @@ class Repository::Filesystem < Repository
 
   def supports_all_revisions?
     false
-  end
-
-  def entries(path=nil, identifier=nil)
-    scm.entries(path, identifier)
   end
 
   def fetch_changesets

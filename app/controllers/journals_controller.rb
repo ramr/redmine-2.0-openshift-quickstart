@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -57,26 +57,20 @@ class JournalsController < ApplicationController
   end
 
   def new
-    journal = Journal.find(params[:journal_id]) if params[:journal_id]
-    if journal
-      user = journal.user
-      text = journal.notes
+    @journal = Journal.visible.find(params[:journal_id]) if params[:journal_id]
+    if @journal
+      user = @journal.user
+      text = @journal.notes
     else
       user = @issue.author
       text = @issue.description
     end
     # Replaces pre blocks with [...]
     text = text.to_s.strip.gsub(%r{<pre>((.|\s)*?)</pre>}m, '[...]')
-    content = "#{ll(Setting.default_language, :text_user_wrote, user)}\n> "
-    content << text.gsub(/(\r?\n|\r\n?)/, "\n> ") + "\n\n"
-
-    render(:update) { |page|
-      page.<< "$('notes').value = \"#{escape_javascript content}\";"
-      page.show 'update'
-      page << "Form.Element.focus('notes');"
-      page << "Element.scrollTo('update');"
-      page << "$('notes').scrollTop = $('notes').scrollHeight - $('notes').clientHeight;"
-    }
+    @content = "#{ll(Setting.default_language, :text_user_wrote, user)}\n> "
+    @content << text.gsub(/(\r?\n|\r\n?)/, "\n> ") + "\n\n"
+  rescue ActiveRecord::RecordNotFound
+    render_404
   end
 
   def edit
@@ -86,7 +80,7 @@ class JournalsController < ApplicationController
       @journal.destroy if @journal.details.empty? && @journal.notes.blank?
       call_hook(:controller_journals_edit_post, { :journal => @journal, :params => params})
       respond_to do |format|
-        format.html { redirect_to :controller => 'issues', :action => 'show', :id => @journal.journalized_id }
+        format.html { redirect_to issue_path(@journal.journalized) }
         format.js { render :action => 'update' }
       end
     else
@@ -103,16 +97,8 @@ class JournalsController < ApplicationController
   private
 
   def find_journal
-    @journal = Journal.find(params[:id])
+    @journal = Journal.visible.find(params[:id])
     @project = @journal.journalized.project
-  rescue ActiveRecord::RecordNotFound
-    render_404
-  end
-
-  # TODO: duplicated in IssuesController
-  def find_issue
-    @issue = Issue.find(params[:id], :include => [:project, :tracker, :status, :author, :priority, :category])
-    @project = @issue.project
   rescue ActiveRecord::RecordNotFound
     render_404
   end

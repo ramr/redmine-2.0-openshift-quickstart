@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,13 +18,26 @@
 class EnumerationsController < ApplicationController
   layout 'admin'
 
-  before_filter :require_admin
+  before_filter :require_admin, :except => :index
+  before_filter :require_admin_or_api_request, :only => :index
   before_filter :build_new_enumeration, :only => [:new, :create]
   before_filter :find_enumeration, :only => [:edit, :update, :destroy]
+  accept_api_auth :index
 
   helper :custom_fields
 
   def index
+    respond_to do |format|
+      format.html
+      format.api {
+        @klass = Enumeration.get_subclass(params[:type])
+        if @klass
+          @enumerations = @klass.shared.sorted.all
+        else
+          render_404
+        end
+      }
+    end
   end
 
   def new
@@ -33,7 +46,7 @@ class EnumerationsController < ApplicationController
   def create
     if request.post? && @enumeration.save
       flash[:notice] = l(:notice_successful_create)
-      redirect_to :action => 'index', :type => @enumeration.type
+      redirect_to enumerations_path
     else
       render :action => 'new'
     end
@@ -45,7 +58,7 @@ class EnumerationsController < ApplicationController
   def update
     if request.put? && @enumeration.update_attributes(params[:enumeration])
       flash[:notice] = l(:notice_successful_update)
-      redirect_to :action => 'index', :type => @enumeration.type
+      redirect_to enumerations_path
     else
       render :action => 'edit'
     end
@@ -55,16 +68,14 @@ class EnumerationsController < ApplicationController
     if !@enumeration.in_use?
       # No associated objects
       @enumeration.destroy
-      redirect_to :action => 'index'
+      redirect_to enumerations_path
       return
-    elsif params[:reassign_to_id]
-      if reassign_to = @enumeration.class.find_by_id(params[:reassign_to_id])
-        @enumeration.destroy(reassign_to)
-        redirect_to :action => 'index'
-        return
-      end
+    elsif params[:reassign_to_id].present? && (reassign_to = @enumeration.class.find_by_id(params[:reassign_to_id].to_i))
+      @enumeration.destroy(reassign_to)
+      redirect_to enumerations_path
+      return
     end
-    @enumerations = @enumeration.class.all - [@enumeration]
+    @enumerations = @enumeration.class.system.all - [@enumeration]
   end
 
   private

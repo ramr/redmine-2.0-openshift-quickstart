@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,20 +19,28 @@ require File.expand_path('../../test_helper', __FILE__)
 
 class GroupTest < ActiveSupport::TestCase
   fixtures :projects, :trackers, :issue_statuses, :issues,
-           :enumerations, :users, :issue_categories,
+           :enumerations, :users,
            :projects_trackers,
            :roles,
            :member_roles,
            :members,
-           :enabled_modules,
-           :workflows,
            :groups_users
 
   include Redmine::I18n
 
   def test_create
-    g = Group.new(:lastname => 'New group')
+    g = Group.new(:name => 'New group')
     assert g.save
+    g.reload
+    assert_equal 'New group', g.name
+  end
+
+  def test_name_should_accept_255_characters
+    name = 'a' * 255
+    g = Group.new(:name => name)
+    assert g.save
+    g.reload
+    assert_equal name, g.name
   end
 
   def test_blank_name_error_message
@@ -51,7 +59,7 @@ class GroupTest < ActiveSupport::TestCase
     assert_include str, g.errors.full_messages
   end
 
-  def test_roles_given_to_new_user
+  def test_group_roles_should_be_given_to_added_user
     group = Group.find(11)
     user = User.find(9)
     project = Project.first
@@ -61,7 +69,7 @@ class GroupTest < ActiveSupport::TestCase
     assert user.member_of?(project)
   end
 
-  def test_roles_given_to_existing_user
+  def test_new_roles_should_be_given_to_existing_user
     group = Group.find(11)
     user = User.find(9)
     project = Project.first
@@ -71,7 +79,22 @@ class GroupTest < ActiveSupport::TestCase
     assert user.member_of?(project)
   end
 
-  def test_roles_updated
+  def test_user_roles_should_updated_when_updating_user_ids
+    group = Group.find(11)
+    user = User.find(9)
+    project = Project.first
+
+    Member.create!(:principal => group, :project => project, :role_ids => [1, 2])
+    group.user_ids = [user.id]
+    group.save!
+    assert User.find(9).member_of?(project)
+
+    group.user_ids = [1]
+    group.save!
+    assert !User.find(9).member_of?(project)
+  end
+
+  def test_user_roles_should_updated_when_updating_group_roles
     group = Group.find(11)
     user = User.find(9)
     project = Project.first
@@ -89,13 +112,13 @@ class GroupTest < ActiveSupport::TestCase
     assert_equal [1], user.reload.roles_for_project(project).collect(&:id).sort
   end
 
-  def test_roles_removed_when_removing_group_membership
+  def test_user_memberships_should_be_removed_when_removing_group_membership
     assert User.find(8).member_of?(Project.find(5))
     Member.find_by_project_id_and_user_id(5, 10).destroy
     assert !User.find(8).member_of?(Project.find(5))
   end
 
-  def test_roles_removed_when_removing_user_from_group
+  def test_user_roles_should_be_removed_when_removing_user_from_group
     assert User.find(8).member_of?(Project.find(5))
     User.find(8).groups = []
     assert !User.find(8).member_of?(Project.find(5))

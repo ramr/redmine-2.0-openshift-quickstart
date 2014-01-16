@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -190,20 +190,17 @@ module Redmine
 
       # Checks if a user is allowed to access the menu item by:
       #
-      # * Checking the conditions of the item
       # * Checking the url target (project only)
+      # * Checking the conditions of the item
       def allowed_node?(node, user, project)
+        if project && user && !user.allowed_to?(node.url, project)
+          return false
+        end
         if node.condition && !node.condition.call(project)
           # Condition that doesn't pass
           return false
         end
-
-        if project
-          return user && user.allowed_to?(node.url, project)
-        else
-          # outside a project, all menu items allowed
-          return true
-        end
+        return true
       end
     end
 
@@ -224,6 +221,8 @@ module Redmine
     end
 
     class Mapper
+      attr_reader :menu, :menu_items
+
       def initialize(menu, items)
         items[menu] ||= MenuNode.new(:root, {})
         @menu = menu

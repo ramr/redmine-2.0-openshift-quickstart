@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class GroupsControllerTest < ActionController::TestCase
-  fixtures :projects, :users, :members, :member_roles, :groups_users
+  fixtures :projects, :users, :members, :member_roles, :roles, :groups_users
 
   def setup
     @request.session[:user_id] = 1
@@ -36,15 +36,21 @@ class GroupsControllerTest < ActionController::TestCase
     assert_template 'show'
   end
 
+  def test_show_invalid_should_return_404
+    get :show, :id => 99
+    assert_response 404
+  end
+
   def test_new
     get :new
     assert_response :success
     assert_template 'new'
+    assert_select 'input[name=?]', 'group[name]'
   end
 
   def test_create
     assert_difference 'Group.count' do
-      post :create, :group => {:lastname => 'New group'}
+      post :create, :group => {:name => 'New group'}
     end
     assert_redirected_to '/groups'
     group = Group.first(:order => 'id DESC')
@@ -54,7 +60,7 @@ class GroupsControllerTest < ActionController::TestCase
 
   def test_create_and_continue
     assert_difference 'Group.count' do
-      post :create, :group => {:lastname => 'New group'}, :continue => 'Create and continue'
+      post :create, :group => {:name => 'New group'}, :continue => 'Create and continue'
     end
     assert_redirected_to '/groups/new'
     group = Group.first(:order => 'id DESC')
@@ -63,7 +69,7 @@ class GroupsControllerTest < ActionController::TestCase
 
   def test_create_with_failure
     assert_no_difference 'Group.count' do
-      post :create, :group => {:lastname => ''}
+      post :create, :group => {:name => ''}
     end
     assert_response :success
     assert_template 'new'
@@ -73,20 +79,23 @@ class GroupsControllerTest < ActionController::TestCase
     get :edit, :id => 10
     assert_response :success
     assert_template 'edit'
-    assert_tag 'div', :attributes => {:id => 'tab-content-users'}
-    assert_tag 'div', :attributes => {:id => 'tab-content-memberships'}
+
+    assert_select 'div#tab-content-users'
+    assert_select 'div#tab-content-memberships' do
+      assert_select 'a', :text => 'Private child of eCookbook'
+    end
   end
 
   def test_update
     new_name = 'New name'
-    put :update, :id => 10, :group => {:lastname => new_name}
+    put :update, :id => 10, :group => {:name => new_name}
     assert_redirected_to '/groups'
     group = Group.find(10)
     assert_equal new_name, group.name
   end
 
   def test_update_with_failure
-    put :update, :id => 10, :group => {:lastname => ''}
+    put :update, :id => 10, :group => {:name => ''}
     assert_response :success
     assert_template 'edit'
   end
@@ -107,8 +116,11 @@ class GroupsControllerTest < ActionController::TestCase
   def test_xhr_add_users
     assert_difference 'Group.find(10).users.count', 2 do
       xhr :post, :add_users, :id => 10, :user_ids => ['2', '3']
+      assert_response :success
+      assert_template 'add_users'
+      assert_equal 'text/javascript', response.content_type
     end
-    assert_select_rjs :replace_html, 'tab-content-users'
+    assert_match /John Smith/, response.body
   end
 
   def test_remove_user
@@ -120,8 +132,10 @@ class GroupsControllerTest < ActionController::TestCase
   def test_xhr_remove_user
     assert_difference 'Group.find(10).users.count', -1 do
       xhr :delete, :remove_user, :id => 10, :user_id => '8'
+      assert_response :success
+      assert_template 'remove_user'
+      assert_equal 'text/javascript', response.content_type
     end
-    assert_select_rjs :replace_html, 'tab-content-users'
   end
 
   def test_new_membership
@@ -133,20 +147,35 @@ class GroupsControllerTest < ActionController::TestCase
   def test_xhr_new_membership
     assert_difference 'Group.find(10).members.count' do
       xhr :post, :edit_membership, :id => 10, :membership => { :project_id => 2, :role_ids => ['1', '2']}
+      assert_response :success
+      assert_template 'edit_membership'
+      assert_equal 'text/javascript', response.content_type
     end
-    assert_select_rjs :replace_html, 'tab-content-memberships'
+    assert_match /OnlineStore/, response.body
   end
 
   def test_xhr_new_membership_with_failure
     assert_no_difference 'Group.find(10).members.count' do
       xhr :post, :edit_membership, :id => 10, :membership => { :project_id => 999, :role_ids => ['1', '2']}
+      assert_response :success
+      assert_template 'edit_membership'
+      assert_equal 'text/javascript', response.content_type
     end
-    assert @response.body.match(/alert/i), "Alert message not sent"
+    assert_match /alert/, response.body, "Alert message not sent"
   end
 
   def test_edit_membership
     assert_no_difference 'Group.find(10).members.count' do
       post :edit_membership, :id => 10, :membership_id => 6, :membership => { :role_ids => ['1', '3']}
+    end
+  end
+
+  def test_xhr_edit_membership
+    assert_no_difference 'Group.find(10).members.count' do
+      xhr :post, :edit_membership, :id => 10, :membership_id => 6, :membership => { :role_ids => ['1', '3']}
+      assert_response :success
+      assert_template 'edit_membership'
+      assert_equal 'text/javascript', response.content_type
     end
   end
 
@@ -159,16 +188,15 @@ class GroupsControllerTest < ActionController::TestCase
   def test_xhr_destroy_membership
     assert_difference 'Group.find(10).members.count', -1 do
       xhr :post, :destroy_membership, :id => 10, :membership_id => 6
+      assert_response :success
+      assert_template 'destroy_membership'
+      assert_equal 'text/javascript', response.content_type
     end
-    assert_select_rjs :replace_html, 'tab-content-memberships'
   end
 
   def test_autocomplete_for_user
-    get :autocomplete_for_user, :id => 10, :q => 'mis'
+    get :autocomplete_for_user, :id => 10, :q => 'smi', :format => 'js'
     assert_response :success
-    users = assigns(:users)
-    assert_not_nil users
-    assert users.any?
-    assert !users.include?(Group.find(10).users.first)
+    assert_include 'John Smith', response.body
   end
 end

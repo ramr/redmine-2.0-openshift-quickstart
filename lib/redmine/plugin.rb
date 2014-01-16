@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -64,15 +64,18 @@ module Redmine #:nodoc:
         end
       end
     end
-    def_field :name, :description, :url, :author, :author_url, :version, :settings
+    def_field :name, :description, :url, :author, :author_url, :version, :settings, :directory
     attr_reader :id
 
     # Plugin constructor
     def self.register(id, &block)
       p = new(id)
       p.instance_eval(&block)
+
       # Set a default name if it was not provided during registration
       p.name(id.to_s.humanize) if p.name.nil?
+      # Set a default directory if it was not provided during registration
+      p.directory(File.join(self.directory, id.to_s)) if p.directory.nil?
 
       # Adds plugin locales if any
       # YAML translation files should be found under <plugin>/config/locales/
@@ -82,6 +85,7 @@ module Redmine #:nodoc:
       view_path = File.join(p.directory, 'app', 'views')
       if File.directory?(view_path)
         ActionController::Base.prepend_view_path(view_path)
+        ActionMailer::Base.prepend_view_path(view_path)
       end
 
       # Adds the app/{controllers,helpers,models} directories of the plugin to the autoload path
@@ -136,12 +140,12 @@ module Redmine #:nodoc:
       @id = id.to_sym
     end
 
-    def directory
-      File.join(self.class.directory, id.to_s)
-    end
-
     def public_directory
       File.join(self.class.public_directory, id.to_s)
+    end
+
+    def to_param
+      id
     end
 
     def assets_directory
@@ -160,31 +164,52 @@ module Redmine #:nodoc:
     #   requires_redmine :version_or_higher => '0.7.3'
     #   requires_redmine '0.7.3'
     #
+    #   # Requires Redmine 0.7.x or higher
+    #   requires_redmine '0.7'
+    #
     #   # Requires a specific Redmine version
     #   requires_redmine :version => '0.7.3'              # 0.7.3 only
+    #   requires_redmine :version => '0.7'                # 0.7.x
     #   requires_redmine :version => ['0.7.3', '0.8.0']   # 0.7.3 or 0.8.0
+    #
+    #   # Requires a Redmine version within a range
+    #   requires_redmine :version => '0.7.3'..'0.9.1'     # >= 0.7.3 and <= 0.9.1
+    #   requires_redmine :version => '0.7'..'0.9'         # >= 0.7.x and <= 0.9.x
     def requires_redmine(arg)
       arg = { :version_or_higher => arg } unless arg.is_a?(Hash)
       arg.assert_valid_keys(:version, :version_or_higher)
 
       current = Redmine::VERSION.to_a
-      arg.each do |k, v|
-        v = [] << v unless v.is_a?(Array)
-        versions = v.collect {|s| s.split('.').collect(&:to_i)}
+      arg.each do |k, req|
         case k
         when :version_or_higher
-          raise ArgumentError.new("wrong number of versions (#{versions.size} for 1)") unless versions.size == 1
-          unless (current <=> versions.first) >= 0
-            raise PluginRequirementError.new("#{id} plugin requires Redmine #{v} or higher but current is #{current.join('.')}")
+          raise ArgumentError.new(":version_or_higher accepts a version string only") unless req.is_a?(String)
+          unless compare_versions(req, current) <= 0
+            raise PluginRequirementError.new("#{id} plugin requires Redmine #{req} or higher but current is #{current.join('.')}")
           end
         when :version
-          unless versions.include?(current.slice(0,3))
-            raise PluginRequirementError.new("#{id} plugin requires one the following Redmine versions: #{v.join(', ')} but current is #{current.join('.')}")
+          req = [req] if req.is_a?(String)
+          if req.is_a?(Array)
+            unless req.detect {|ver| compare_versions(ver, current) == 0}
+              raise PluginRequirementError.new("#{id} plugin requires one the following Redmine versions: #{req.join(', ')} but current is #{current.join('.')}")
+            end
+          elsif req.is_a?(Range)
+            unless compare_versions(req.first, current) <= 0 && compare_versions(req.last, current) >= 0
+              raise PluginRequirementError.new("#{id} plugin requires a Redmine version between #{req.first} and #{req.last} but current is #{current.join('.')}")
+            end
+          else
+            raise ArgumentError.new(":version option accepts a version string, an array or a range of versions")
           end
         end
       end
       true
     end
+
+    def compare_versions(requirement, current)
+      requirement = requirement.split('.').collect(&:to_i)
+      requirement <=> current.slice(0, requirement.size)
+    end
+    private :compare_versions
 
     # Sets a requirement on a Redmine plugin version
     # Raises a PluginRequirementError exception if the requirement is not met
@@ -244,13 +269,15 @@ module Redmine #:nodoc:
     #   permission :destroy_contacts, { :contacts => :destroy }
     #   permission :view_contacts, { :contacts => [:index, :show] }
     #
-    # The +options+ argument can be used to make the permission public (implicitly given to any user)
-    # or to restrict users the permission can be given to.
+    # The +options+ argument is a hash that accept the following keys:
+    # * :public => the permission is public if set to true (implicitly given to any user)
+    # * :require => can be set to one of the following values to restrict users the permission can be given to: :loggedin, :member
+    # * :read => set it to true so that the permission is still granted on closed projects
     #
     # Examples
     #   # A permission that is implicitly given to any user
     #   # This permission won't appear on the Roles & Permissions setup screen
-    #   permission :say_hello, { :example => :say_hello }, :public => true
+    #   permission :say_hello, { :example => :say_hello }, :public => true, :read => true
     #
     #   # A permission that can be given to any user
     #   permission :say_hello, { :example => :say_hello }
@@ -333,7 +360,11 @@ module Redmine #:nodoc:
 
       unless source_files.empty?
         base_target_dir = File.join(destination, File.dirname(source_files.first).gsub(source, ''))
-        FileUtils.mkdir_p(base_target_dir)
+        begin
+          FileUtils.mkdir_p(base_target_dir)
+        rescue Exception => e
+          raise "Could not create directory #{base_target_dir}: " + e.message
+        end
       end
 
       source_dirs.each do |dir|
@@ -343,7 +374,7 @@ module Redmine #:nodoc:
         begin
           FileUtils.mkdir_p(target_dir)
         rescue Exception => e
-          raise "Could not create directory #{target_dir}: \n" + e
+          raise "Could not create directory #{target_dir}: " + e.message
         end
       end
 
@@ -354,7 +385,7 @@ module Redmine #:nodoc:
             FileUtils.cp(file, target)
           end
         rescue Exception => e
-          raise "Could not copy #{file} to #{target}: \n" + e
+          raise "Could not copy #{file} to #{target}: " + e.message
         end
       end
     end
@@ -412,7 +443,7 @@ module Redmine #:nodoc:
     class Migrator < ActiveRecord::Migrator
       # We need to be able to set the 'current' plugin being migrated.
       cattr_accessor :current_plugin
-    
+
       class << self
         # Runs the migrations from a plugin, up (or down) to the version given
         def migrate_plugin(plugin, version)
@@ -420,7 +451,7 @@ module Redmine #:nodoc:
           return if current_version(plugin) == version
           migrate(plugin.migration_directory, version)
         end
-        
+
         def current_version(plugin=current_plugin)
           # Delete migrations that don't match .. to_i will work because the number comes first
           ::ActiveRecord::Base.connection.select_values(
@@ -428,14 +459,14 @@ module Redmine #:nodoc:
           ).delete_if{ |v| v.match(/-#{plugin.id}/) == nil }.map(&:to_i).max || 0
         end
       end
-           
+
       def migrated
         sm_table = self.class.schema_migrations_table_name
         ::ActiveRecord::Base.connection.select_values(
           "SELECT version FROM #{sm_table}"
         ).delete_if{ |v| v.match(/-#{current_plugin.id}/) == nil }.map(&:to_i).sort
       end
-      
+
       def record_version_state_after_migrating(version)
         super(version.to_s + "-" + current_plugin.id.to_s)
       end

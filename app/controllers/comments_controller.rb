@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -32,12 +32,12 @@ class CommentsController < ApplicationController
       flash[:notice] = l(:label_comment_added)
     end
 
-    redirect_to :controller => 'news', :action => 'show', :id => @news
+    redirect_to news_path(@news)
   end
 
   def destroy
     @news.comments.find(params[:comment_id]).destroy
-    redirect_to :controller => 'news', :action => 'show', :id => @news
+    redirect_to news_path(@news)
   end
 
   private

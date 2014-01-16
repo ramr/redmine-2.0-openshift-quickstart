@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,8 +16,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 require File.expand_path('../../../test_helper', __FILE__)
-require 'pp'
-class ApiTest::NewsTest < ActionController::IntegrationTest
+
+class Redmine::ApiTest::NewsTest < Redmine::ApiTest::Base
   fixtures :projects, :trackers, :issue_statuses, :issues,
            :enumerations, :users, :issue_categories,
            :projects_trackers,
@@ -25,74 +25,60 @@ class ApiTest::NewsTest < ActionController::IntegrationTest
            :member_roles,
            :members,
            :enabled_modules,
-           :workflows,
            :news
 
   def setup
     Setting.rest_api_enabled = '1'
   end
 
-  context "GET /news" do
-    context ".xml" do
-      should "return news" do
-        get '/news.xml'
+  should_allow_api_authentication(:get, "/projects/onlinestore/news.xml")
+  should_allow_api_authentication(:get, "/projects/onlinestore/news.json")
 
-        assert_tag :tag => 'news',
-          :attributes => {:type => 'array'},
-          :child => {
-            :tag => 'news',
-            :child => {
-              :tag => 'id',
-              :content => '2'
-            }
-          }
-      end
-    end
+  test "GET /news.xml should return news" do
+    get '/news.xml'
 
-    context ".json" do
-      should "return news" do
-        get '/news.json'
-
-        json = ActiveSupport::JSON.decode(response.body)
-        assert_kind_of Hash, json
-        assert_kind_of Array, json['news']
-        assert_kind_of Hash, json['news'].first
-        assert_equal 2, json['news'].first['id']
-      end
-    end
+    assert_tag :tag => 'news',
+      :attributes => {:type => 'array'},
+      :child => {
+        :tag => 'news',
+        :child => {
+          :tag => 'id',
+          :content => '2'
+        }
+      }
   end
 
-  context "GET /projects/:project_id/news" do
-    context ".xml" do
-      should_allow_api_authentication(:get, "/projects/onlinestore/news.xml")
+  test "GET /news.json should return news" do
+    get '/news.json'
 
-      should "return news" do
-        get '/projects/ecookbook/news.xml'
+    json = ActiveSupport::JSON.decode(response.body)
+    assert_kind_of Hash, json
+    assert_kind_of Array, json['news']
+    assert_kind_of Hash, json['news'].first
+    assert_equal 2, json['news'].first['id']
+  end
 
-        assert_tag :tag => 'news',
-          :attributes => {:type => 'array'},
-          :child => {
-            :tag => 'news',
-            :child => {
-              :tag => 'id',
-              :content => '2'
-            }
-          }
-      end
-    end
+  test "GET /projects/:project_id/news.xml should return news" do
+    get '/projects/ecookbook/news.xml'
 
-    context ".json" do
-      should_allow_api_authentication(:get, "/projects/onlinestore/news.json")
+    assert_tag :tag => 'news',
+      :attributes => {:type => 'array'},
+      :child => {
+        :tag => 'news',
+        :child => {
+          :tag => 'id',
+          :content => '2'
+        }
+      }
+  end
 
-      should "return news" do
-        get '/projects/ecookbook/news.json'
+  test "GET /projects/:project_id/news.json should return news" do
+    get '/projects/ecookbook/news.json'
 
-        json = ActiveSupport::JSON.decode(response.body)
-        assert_kind_of Hash, json
-        assert_kind_of Array, json['news']
-        assert_kind_of Hash, json['news'].first
-        assert_equal 2, json['news'].first['id']
-      end
-    end
+    json = ActiveSupport::JSON.decode(response.body)
+    assert_kind_of Hash, json
+    assert_kind_of Array, json['news']
+    assert_kind_of Hash, json['news'].first
+    assert_equal 2, json['news'].first['id']
   end
 end
