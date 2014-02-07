@@ -24,7 +24,7 @@ Make a note of the username, password, and host name as you will need to use the
 Add this upstream Redmine quickstart repo
 
 	cd redmine
-	git remote add upstream -m master git://github.com/openshift-quickstart/redmine-openshift-quickstart.git
+	git remote add upstream -m master git://github.com/openshift/redmine-openshift-quickstart.git
 	git pull -s recursive -X theirs upstream master
 
 Then push the repo upstream
