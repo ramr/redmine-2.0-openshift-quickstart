@@ -11,7 +11,7 @@ Running on OpenShift
 
 Create an account at http://openshift.redhat.com/
 
-Create a ruby application (ruby-1.8 or ruby-1.9)
+Create a ruby application
 
 	rhc app create redmine ruby-1.9 mysql-5.1 
 
