@@ -5,10 +5,6 @@
 
 set -e
 
-pushd ${OPENSHIFT_REPO_DIR} > /dev/null
-bundle exec rake generate_secret_token
-popd > /dev/null
-
 if [ -z $OPENSHIFT_MYSQL_DB_HOST ]; then
     echo 1>&2
     echo "Could not find mysql database. Please run:" 1>&2
