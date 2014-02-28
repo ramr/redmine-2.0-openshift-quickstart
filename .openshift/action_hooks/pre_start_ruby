@@ -12,3 +12,8 @@
 # prevent your application from stopping cleanly or starting at all.
 # Application start and stop is subject to different timeouts
 # throughout the system.
+
+pushd ${OPENSHIFT_REPO_DIR} > /dev/null
+	echo "Generating secret token"
+	bundle exec "env RAILS_ENV='production' rake generate_secret_token"
+popd > /dev/null
