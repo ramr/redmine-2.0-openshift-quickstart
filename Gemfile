@@ -33,10 +33,20 @@ platforms :jruby do
   gem "activerecord-jdbc-adapter", "~> 1.3.2"
 end
 
-gem "mysql", "~> 2.8.1"
-gem "mysql2", "~> 0.3.11"
-gem "pg", ">= 0.11.0"
-gem "sqlite3"
+group :mysql do
+  gem "mysql", "~> 2.8.1", :platforms => [:mri_18]
+  gem "mysql2", "~> 0.3.11", :platforms => [:mri_19]
+end
+
+# TO_DO: Add support for PostgreSQL and Sqlite as
+# for now Redmine quickstart works under
+# group :postgres do
+#   gem "pg", ">= 0.11.0"
+# end
+
+# group :sqlite3 do
+#   gem "sqlite3"
+# end
 
 group :development do
   gem "rdoc", ">= 2.4.2"

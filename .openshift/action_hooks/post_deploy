@@ -14,35 +14,40 @@ if [ -z $OPENSHIFT_MYSQL_DB_HOST ]; then
     exit 5
 fi
 
-# Confirm database exists, if not create it
-qry="select * from redmine.users;"
-if ! mysql -h "$OPENSHIFT_MYSQL_DB_HOST"              \
-                    -P "$OPENSHIFT_MYSQL_DB_PORT"    \
-                    -u "$OPENSHIFT_MYSQL_DB_USERNAME"          \
-                    --password="$OPENSHIFT_MYSQL_DB_PASSWORD"  \
-                    "$OPENSHIFT_APP_NAME" -e "$qry" > /dev/null 2>&1; then
-    echo
-    echo "Schema not found! Recreating redmine schema"
-    echo
-    mysql -h "$OPENSHIFT_MYSQL_DB_HOST"              \
-                    -P "$OPENSHIFT_MYSQL_DB_PORT"    \
-                    -u "$OPENSHIFT_MYSQL_DB_USERNAME"          \
-                    --password="$OPENSHIFT_MYSQL_DB_PASSWORD"  \
-                    "$OPENSHIFT_APP_NAME" <<MYEOF
-drop database if exists redmine;
-create database redmine character set utf8;
-MYEOF
+# Determinate wheather it is or it isn't the initial deployment,
+# so the database will be created from redmine.sql or there are
+# changes which need to be migrated.
 
-    # Run db:migrate
+if echo "use $OPENSHIFT_APP_NAME; show tables" | mysql  -h "$OPENSHIFT_MYSQL_DB_HOST" \
+                                                        -P "$OPENSHIFT_MYSQL_DB_PORT" \
+                                                        -u "$OPENSHIFT_MYSQL_DB_USERNAME" \
+                                                        --password="$OPENSHIFT_MYSQL_DB_PASSWORD" | grep attachments > /dev/null
+then
+    # Runs on every other Redmine application deployment
+    # except the first one.
     pushd ${OPENSHIFT_REPO_DIR} > /dev/null
+    echo "Migrating database"
     bundle exec "env RAILS_ENV='production' rake db:migrate"
-    bundle exec "env RAILS_ENV='production' REDMINE_LANG='en' rake redmine:load_default_data"
     popd > /dev/null
-    echo
-    echo "done."
 else
-    echo "Database found, skipping import."
+    # Runs on the inirtial Redmine deployment
+    ###
+    # If the quickstart is updated for newer version
+    # redmine.sql needs to be updated too.
+
+    pushd ${OPENSHIFT_REPO_DIR}/db > /dev/null
+    echo "Loading database"
+    gunzip redmine.sql.gz
+    mysql   -h "$OPENSHIFT_MYSQL_DB_HOST" \
+            -P "$OPENSHIFT_MYSQL_DB_PORT" \
+            -u "$OPENSHIFT_MYSQL_DB_USERNAME" \
+            --password="$OPENSHIFT_MYSQL_DB_PASSWORD" \
+            "$OPENSHIFT_APP_NAME" < redmine.sql
+    echo "Loading Redmine default configuration data"
+    # bundle exec "env RAILS_ENV='production' REDMINE_LANG='en' rake redmine:load_default_data"
+    popd > /dev/null
 fi
+
 
 if [ ! -d ${OPENSHIFT_DATA_DIR}files ]
 then
