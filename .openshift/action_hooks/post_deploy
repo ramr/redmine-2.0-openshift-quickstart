@@ -5,6 +5,14 @@
 
 set -e
 
+function mysql_call() {
+    mysql   -h "$OPENSHIFT_MYSQL_DB_HOST" \
+            -P "$OPENSHIFT_MYSQL_DB_PORT" \
+            -u "$OPENSHIFT_MYSQL_DB_USERNAME" \
+            --password="$OPENSHIFT_MYSQL_DB_PASSWORD" \
+            "$OPENSHIFT_APP_NAME"
+}
+
 if [ -z $OPENSHIFT_MYSQL_DB_HOST ]; then
     echo 1>&2
     echo "Could not find mysql database. Please run:" 1>&2
@@ -18,10 +26,7 @@ fi
 # so the database will be created from redmine.sql or there are
 # changes which need to be migrated.
 
-if echo "use $OPENSHIFT_APP_NAME; show tables" | mysql  -h "$OPENSHIFT_MYSQL_DB_HOST" \
-                                                        -P "$OPENSHIFT_MYSQL_DB_PORT" \
-                                                        -u "$OPENSHIFT_MYSQL_DB_USERNAME" \
-                                                        --password="$OPENSHIFT_MYSQL_DB_PASSWORD" | grep attachments > /dev/null
+if echo "use $OPENSHIFT_APP_NAME; show tables"  | mysql_call | grep attachments > /dev/null
 then
     # Runs on every other Redmine application deployment
     # except the first one.
@@ -30,24 +35,17 @@ then
     bundle exec "env RAILS_ENV='production' rake db:migrate"
     popd > /dev/null
 else
-    # Runs on the inirtial Redmine deployment
+    # Runs on the initial Redmine deployment
     ###
     # If the quickstart is updated for newer version
     # redmine.sql needs to be updated too.
 
     pushd ${OPENSHIFT_REPO_DIR}/db > /dev/null
     echo "Loading database"
-    gunzip redmine.sql.gz
-    mysql   -h "$OPENSHIFT_MYSQL_DB_HOST" \
-            -P "$OPENSHIFT_MYSQL_DB_PORT" \
-            -u "$OPENSHIFT_MYSQL_DB_USERNAME" \
-            --password="$OPENSHIFT_MYSQL_DB_PASSWORD" \
-            "$OPENSHIFT_APP_NAME" < redmine.sql
-    echo "Loading Redmine default configuration data"
-    # bundle exec "env RAILS_ENV='production' REDMINE_LANG='en' rake redmine:load_default_data"
+    gunzip -c redmine.sql.gz | mysql_call
+    rm redmine.sql.gz
     popd > /dev/null
 fi
-
 
 if [ ! -d ${OPENSHIFT_DATA_DIR}files ]
 then
