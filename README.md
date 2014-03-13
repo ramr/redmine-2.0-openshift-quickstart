@@ -9,7 +9,7 @@ More information can be found on the official Redmine set (www.redmine.org)
 Running on OpenShift
 --------------------
 
-Create an account at http://openshift.redhat.com/
+Create an account at https://www.openshift.com
 
 Create a ruby application
 
