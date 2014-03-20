@@ -41,6 +41,7 @@ gem "sqlite3"
 group :development do
   gem "rdoc", ">= 2.4.2"
   gem "yard"
+  gem "thor", "= 0.14.6"
 end
 
 local_gemfile = File.join(File.dirname(__FILE__), "Gemfile.local")
