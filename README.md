@@ -5,7 +5,8 @@ Redmine is a flexible project management web application. Written using Ruby on 
 
 Redmine is open source and released under the terms of the GNU General Public License v2 (GPL).
 
-More information can be found on the official Redmine set (www.redmine.org)
+More information can be found at www.redmine.org
+
 Running on OpenShift
 --------------------
 
