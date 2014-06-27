@@ -47,6 +47,11 @@ else
     popd > /dev/null
 fi
 
+pushd ${OPENSHIFT_REPO_DIR} > /dev/null
+    echo "Generating secret token"
+    bundle exec "env RAILS_ENV='production' rake generate_secret_token"
+popd > /dev/null
+
 if [ ! -d ${OPENSHIFT_DATA_DIR}files ]
 then
 	mkdir ${OPENSHIFT_DATA_DIR}files
