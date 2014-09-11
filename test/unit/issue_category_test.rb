@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class IssueCategoryTest < ActiveSupport::TestCase
-  fixtures :issue_categories, :issues
+  fixtures :issue_categories, :issues, :users, :groups_users
 
   def setup
     @category = IssueCategory.find(1)

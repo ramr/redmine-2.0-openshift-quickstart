@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,6 +19,19 @@ require File.expand_path('../../test_helper', __FILE__)
 
 class IssuePriorityTest < ActiveSupport::TestCase
   fixtures :enumerations, :issues
+
+  def test_named_scope
+    assert_equal Enumeration.find_by_name('Normal'), Enumeration.named('normal').first
+  end
+
+  def test_default_should_return_the_default_priority
+    assert_equal Enumeration.find_by_name('Normal'), IssuePriority.default
+  end
+
+  def test_default_should_return_nil_when_no_default_priority
+    IssuePriority.update_all :is_default => false
+    assert_nil IssuePriority.default
+  end
 
   def test_should_be_an_enumeration
     assert IssuePriority.ancestors.include?(Enumeration)
@@ -59,5 +72,35 @@ class IssuePriorityTest < ActiveSupport::TestCase
     priority = IssuePriority.first
     priority.expects(:reset_positions_in_list).once
     priority.move_to = 'higher'
+  end
+
+  def test_clear_position_names_should_set_position_names_to_nil
+    IssuePriority.clear_position_names
+    assert IssuePriority.all.all? {|priority| priority.position_name.nil?}
+  end
+
+  def test_compute_position_names_with_default_priority
+    IssuePriority.clear_position_names
+
+    IssuePriority.compute_position_names
+    assert_equal %w(lowest default high3 high2 highest), IssuePriority.active.all.sort.map(&:position_name)
+  end
+
+  def test_compute_position_names_without_default_priority_should_split_priorities
+    IssuePriority.clear_position_names
+    IssuePriority.update_all :is_default => false
+
+    IssuePriority.compute_position_names
+    assert_equal %w(lowest low2 default high2 highest), IssuePriority.active.all.sort.map(&:position_name)
+  end
+
+  def test_adding_a_priority_should_update_position_names
+    priority = IssuePriority.create!(:name => 'New')
+    assert_equal %w(lowest default high4 high3 high2 highest), IssuePriority.active.all.sort.map(&:position_name)
+  end
+
+  def test_destroying_a_priority_should_update_position_names
+    IssuePriority.find_by_position_name('highest').destroy
+    assert_equal %w(lowest default high2 highest), IssuePriority.active.all.sort.map(&:position_name)
   end
 end

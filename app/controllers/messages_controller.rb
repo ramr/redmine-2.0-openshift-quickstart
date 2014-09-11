@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,9 +19,11 @@ class MessagesController < ApplicationController
   menu_item :boards
   default_search_scope :messages
   before_filter :find_board, :only => [:new, :preview]
+  before_filter :find_attachments, :only => [:preview]
   before_filter :find_message, :except => [:new, :preview]
   before_filter :authorize, :except => [:preview, :edit, :destroy]
 
+  helper :boards
   helper :watchers
   helper :attachments
   include AttachmentsHelper
@@ -33,16 +35,18 @@ class MessagesController < ApplicationController
     page = params[:page]
     # Find the page of the requested reply
     if params[:r] && page.nil?
-      offset = @topic.children.count(:conditions => ["#{Message.table_name}.id < ?", params[:r].to_i])
+      offset = @topic.children.where("#{Message.table_name}.id < ?", params[:r].to_i).count
       page = 1 + offset / REPLIES_PER_PAGE
     end
 
     @reply_count = @topic.children.count
-    @reply_pages = Paginator.new self, @reply_count, REPLIES_PER_PAGE, page
-    @replies =  @topic.children.find(:all, :include => [:author, :attachments, {:board => :project}],
-                                           :order => "#{Message.table_name}.created_on ASC",
-                                           :limit => @reply_pages.items_per_page,
-                                           :offset => @reply_pages.current.offset)
+    @reply_pages = Paginator.new @reply_count, REPLIES_PER_PAGE, page
+    @replies =  @topic.children.
+      includes(:author, :attachments, {:board => :project}).
+      reorder("#{Message.table_name}.created_on ASC").
+      limit(@reply_pages.per_page).
+      offset(@reply_pages.offset).
+      all
 
     @reply = Message.new(:subject => "RE: #{@message.subject}")
     render :action => "show", :layout => false if request.xhr?
@@ -59,7 +63,7 @@ class MessagesController < ApplicationController
       if @message.save
         call_hook(:controller_messages_new_after_save, { :params => params, :message => @message})
         render_attachment_warning_if_needed(@message)
-        redirect_to :action => 'show', :id => @message
+        redirect_to board_message_path(@board, @message)
       end
     end
   end
@@ -76,7 +80,7 @@ class MessagesController < ApplicationController
       attachments = Attachment.attach_files(@reply, params[:attachments])
       render_attachment_warning_if_needed(@reply)
     end
-    redirect_to :action => 'show', :id => @topic, :r => @reply
+    redirect_to board_message_path(@board, @topic, :r => @reply)
   end
 
   # Edit a message
@@ -88,7 +92,7 @@ class MessagesController < ApplicationController
       render_attachment_warning_if_needed(@message)
       flash[:notice] = l(:notice_successful_update)
       @message.reload
-      redirect_to :action => 'show', :board_id => @message.board, :id => @message.root, :r => (@message.parent_id && @message.id)
+      redirect_to board_message_path(@message.board, @message.root, :r => (@message.parent_id && @message.id))
     end
   end
 
@@ -97,38 +101,31 @@ class MessagesController < ApplicationController
     (render_403; return false) unless @message.destroyable_by?(User.current)
     r = @message.to_param
     @message.destroy
-    redirect_to @message.parent.nil? ?
-      { :controller => 'boards', :action => 'show', :project_id => @project, :id => @board } :
-      { :action => 'show', :id => @message.parent, :r => r }
+    if @message.parent
+      redirect_to board_message_path(@board, @message.parent, :r => r)
+    else
+      redirect_to project_board_path(@project, @board)
+    end
   end
 
   def quote
-    user = @message.author
-    text = @message.content
-    subject = @message.subject.gsub('"', '\"')
-    subject = "RE: #{subject}" unless subject.starts_with?('RE:')
-    content = "#{ll(Setting.default_language, :text_user_wrote, user)}\\n> "
-    content << text.to_s.strip.gsub(%r{<pre>((.|\s)*?)</pre>}m, '[...]').gsub('"', '\"').gsub(/(\r?\n|\r\n?)/, "\\n> ") + "\\n\\n"
-    render(:update) { |page|
-      page << "$('message_subject').value = \"#{subject}\";"
-      page.<< "$('message_content').value = \"#{content}\";"
-      page.show 'reply'
-      page << "Form.Element.focus('message_content');"
-      page << "Element.scrollTo('reply');"
-      page << "$('message_content').scrollTop = $('message_content').scrollHeight - $('message_content').clientHeight;"
-    }
+    @subject = @message.subject
+    @subject = "RE: #{@subject}" unless @subject.starts_with?('RE:')
+
+    @content = "#{ll(Setting.default_language, :text_user_wrote, @message.author)}\n> "
+    @content << @message.content.to_s.strip.gsub(%r{<pre>((.|\s)*?)</pre>}m, '[...]').gsub(/(\r?\n|\r\n?)/, "\n> ") + "\n\n"
   end
 
   def preview
     message = @board.messages.find_by_id(params[:id])
-    @attachements = message.attachments if message
     @text = (params[:message] || params[:reply])[:content]
+    @previewed = message
     render :partial => 'common/preview'
   end
 
 private
   def find_message
-    find_board
+    return unless find_board
     @message = @board.messages.find(params[:id], :include => :parent)
     @topic = @message.root
   rescue ActiveRecord::RecordNotFound
@@ -140,5 +137,6 @@ private
     @project = @board.project
   rescue ActiveRecord::RecordNotFound
     render_404
+    nil
   end
 end

@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -35,6 +35,18 @@ module ActiveRecord
     def construct_relation_for_association_find_ids(join_dependency)
       relation = except(:includes, :eager_load, :preload, :select).select("#{table_name}.id")
       apply_join_dependency(relation, join_dependency)
+    end
+  end
+end
+
+class DateValidator < ActiveModel::EachValidator
+  def validate_each(record, attribute, value)
+    before_type_cast = record.attributes_before_type_cast[attribute.to_s]
+    if before_type_cast.is_a?(String) && before_type_cast.present?
+      # TODO: #*_date_before_type_cast returns a Mysql::Time with ruby1.8+mysql gem
+      unless before_type_cast =~ /\A\d{4}-\d{2}-\d{2}( 00:00:00)?\z/ && value
+        record.errors.add attribute, :not_a_date
+      end
     end
   end
 end

@@ -1,46 +1,60 @@
 #!/bin/bash
 # This is a simple post deploy hook executed after your application
-# is deployed and started.  This script gets executed directly, so 
+# is deployed and started.  This script gets executed directly, so
 # it could be python, php, ruby, etc.
 
 set -e
 
-pushd ${OPENSHIFT_REPO_DIR} > /dev/null
-bundle exec rake generate_secret_token
-popd
+function mysql_call() {
+    mysql   -h "$OPENSHIFT_MYSQL_DB_HOST" \
+            -P "$OPENSHIFT_MYSQL_DB_PORT" \
+            -u "$OPENSHIFT_MYSQL_DB_USERNAME" \
+            --password="$OPENSHIFT_MYSQL_DB_PASSWORD" \
+            "$OPENSHIFT_APP_NAME"
+}
 
-if [ -z $OPENSHIFT_DB_HOST ]; then
+if [ -z $OPENSHIFT_MYSQL_DB_HOST ]; then
     echo 1>&2
     echo "Could not find mysql database. Please run:" 1>&2
-    echo "rhc app cartridge add -a $OPENSHIFT_APP_NAME -c mysql-5.1" 1>&2
+    echo "rhc cartridge add -a $OPENSHIFT_APP_NAME -c mysql-5.1" 1>&2
     echo "then make a sample commit (add whitespace somewhere) and re-push" 1>&2
     echo 1>&2
     exit 5
 fi
 
-# Confirm database exists, if not create it
-qry="select * from redmine.users;"
-if ! /usr/bin/mysql -h "$OPENSHIFT_DB_HOST" -u "$OPENSHIFT_DB_USERNAME"  \
-                    --password="$OPENSHIFT_DB_PASSWORD" "$OPENSHIFT_APP_NAME" \
-                    -e "$qry" > /dev/null 2>&1; then
-    echo
-    echo "Schema not found! Recreating redmine schema"
-    echo
-    /usr/bin/mysql -h "$OPENSHIFT_DB_HOST" -u "$OPENSHIFT_DB_USERNAME"  \
-          --password="$OPENSHIFT_DB_PASSWORD" "$OPENSHIFT_APP_NAME" <<MYEOF
-drop database if exists redmine;
-create database redmine character set utf8;
-MYEOF
+# Determinate wheather it is or it isn't the initial deployment,
+# so the database will be created from redmine.sql or there are
+# changes which need to be migrated.
 
-    # Run db:migrate
+if echo "use $OPENSHIFT_APP_NAME; show tables"  | mysql_call | grep attachments > /dev/null
+then
+    # Runs on every other Redmine application deployment
+    # except the first one.
     pushd ${OPENSHIFT_REPO_DIR} > /dev/null
-    bundle exec rake db:migrate RAILS_ENV=production 
-    bundle exec rake redmine:load_default_data RAILS_ENV=production  \
-                                               REDMINE_LANG='en'
+    echo "Migrating database"
+    bundle exec "env RAILS_ENV='production' rake db:migrate"
     popd > /dev/null
-    echo
-    echo "done."
 else
-    echo "Database found, skipping import."
+    # Runs on the initial Redmine deployment
+    ###
+    # If the quickstart is updated for newer version
+    # redmine.sql needs to be updated too.
+
+    pushd ${OPENSHIFT_REPO_DIR}/db > /dev/null
+    echo "Loading database"
+    gunzip -c redmine.sql.gz | mysql_call
+    rm redmine.sql.gz
+    popd > /dev/null
 fi
 
+pushd ${OPENSHIFT_REPO_DIR} > /dev/null
+    echo "Generating secret token"
+    bundle exec "env RAILS_ENV='production' rake generate_secret_token"
+popd > /dev/null
+
+if [ ! -d ${OPENSHIFT_DATA_DIR}files ]
+then
+	mkdir ${OPENSHIFT_DATA_DIR}files
+fi
+
+ln -sf ${OPENSHIFT_DATA_DIR}files ${OPENSHIFT_REPO_DIR}files

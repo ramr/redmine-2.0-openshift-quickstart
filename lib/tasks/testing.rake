@@ -6,9 +6,8 @@ namespace :test do
     rm_f "coverage"
     rm_f "coverage.data"
     rcov = "rcov --rails --aggregate coverage.data --text-summary -Ilib --html --exclude gems/"
-    files = Dir.glob("test/**/*_test.rb").join(" ")
+    files = %w(unit functional integration).map {|dir| Dir.glob("test/#{dir}/**/*_test.rb")}.flatten.join(" ")
     system("#{rcov} #{files}")
-    system("open coverage/index.html") if PLATFORM['darwin']
   end
 
   desc 'Run unit and functional scm tests'
@@ -101,4 +100,11 @@ namespace :test do
     t.test_files = FileList['test/integration/routing/*_test.rb']
   end
   Rake::Task['test:rdm_routing'].comment = "Run the routing tests"
+
+  Rake::TestTask.new(:ui => "db:test:prepare") do |t|
+    t.libs << "test"
+    t.verbose = true
+    t.test_files = FileList['test/ui/**/*_test.rb']
+  end
+  Rake::Task['test:ui'].comment = "Run the UI tests with Capybara (PhantomJS listening on port 4444 is required)"
 end

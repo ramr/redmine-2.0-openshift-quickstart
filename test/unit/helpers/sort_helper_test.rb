@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,6 +19,7 @@ require File.expand_path('../../../test_helper', __FILE__)
 
 class SortHelperTest < ActionView::TestCase
   include SortHelper
+  include Redmine::I18n
   include ERB::Util
 
   def setup
@@ -30,21 +31,21 @@ class SortHelperTest < ActionView::TestCase
     sort_init 'attr1', 'desc'
     sort_update(['attr1', 'attr2'])
 
-    assert_equal 'attr1 DESC', sort_clause
+    assert_equal ['attr1 DESC'], sort_clause
   end
 
   def test_default_sort_clause_with_hash
     sort_init 'attr1', 'desc'
     sort_update({'attr1' => 'table1.attr1', 'attr2' => 'table2.attr2'})
 
-    assert_equal 'table1.attr1 DESC', sort_clause
+    assert_equal ['table1.attr1 DESC'], sort_clause
   end
 
   def test_default_sort_clause_with_multiple_columns
     sort_init 'attr1', 'desc'
     sort_update({'attr1' => ['table1.attr1', 'table1.attr2'], 'attr2' => 'table2.attr2'})
 
-    assert_equal 'table1.attr1 DESC, table1.attr2 DESC', sort_clause
+    assert_equal ['table1.attr1 DESC', 'table1.attr2 DESC'], sort_clause
   end
 
   def test_params_sort
@@ -53,7 +54,7 @@ class SortHelperTest < ActionView::TestCase
     sort_init 'attr1', 'desc'
     sort_update({'attr1' => 'table1.attr1', 'attr2' => 'table2.attr2'})
 
-    assert_equal 'table1.attr1, table2.attr2 DESC', sort_clause
+    assert_equal ['table1.attr1', 'table2.attr2 DESC'], sort_clause
     assert_equal 'attr1,attr2:desc', @session['foo_bar_sort']
   end
 
@@ -63,7 +64,7 @@ class SortHelperTest < ActionView::TestCase
     sort_init 'attr1', 'desc'
     sort_update({'attr1' => 'table1.attr1', 'attr2' => 'table2.attr2'})
 
-    assert_equal 'table1.attr1 DESC', sort_clause
+    assert_equal ['table1.attr1 DESC'], sort_clause
     assert_equal 'attr1:desc', @session['foo_bar_sort']
   end
 
@@ -73,7 +74,7 @@ class SortHelperTest < ActionView::TestCase
     sort_init 'attr1', 'desc'
     sort_update({'attr1' => 'table1.attr1', 'attr2' => 'table2.attr2'})
 
-    assert_equal 'table1.attr1, table2.attr2', sort_clause
+    assert_equal ['table1.attr1', 'table2.attr2'], sort_clause
     assert_equal 'attr1,attr2', @session['foo_bar_sort']
   end
 

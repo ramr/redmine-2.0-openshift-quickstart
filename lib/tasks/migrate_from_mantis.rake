@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@
 desc 'Mantis migration script'
 
 require 'active_record'
-require 'iconv'
+require 'iconv' if RUBY_VERSION < '1.9'
 require 'pp'
 
 namespace :redmine do
@@ -30,7 +30,7 @@ task :migrate_from_mantis => :environment do
       assigned_status = IssueStatus.find_by_position(2)
       resolved_status = IssueStatus.find_by_position(3)
       feedback_status = IssueStatus.find_by_position(4)
-      closed_status = IssueStatus.find :first, :conditions => { :is_closed => true }
+      closed_status = IssueStatus.where(:is_closed => true).first
       STATUS_MAPPING = {10 => DEFAULT_STATUS,  # new
                         20 => feedback_status, # feedback
                         30 => DEFAULT_STATUS,  # acknowledged
@@ -53,7 +53,7 @@ task :migrate_from_mantis => :environment do
       TRACKER_BUG = Tracker.find_by_position(1)
       TRACKER_FEATURE = Tracker.find_by_position(2)
 
-      roles = Role.find(:all, :conditions => {:builtin => 0}, :order => 'position ASC')
+      roles = Role.where(:builtin => 0).order('position ASC').all
       manager_role = roles[0]
       developer_role = roles[1]
       DEFAULT_ROLE = roles.last
@@ -119,7 +119,7 @@ task :migrate_from_mantis => :environment do
       has_many :members, :class_name => "MantisProjectUser", :foreign_key => :project_id
 
       def identifier
-        read_attribute(:name).gsub(/[^a-z0-9\-]+/, '-').slice(0, Project::IDENTIFIER_MAX_LENGTH)
+        read_attribute(:name).downcase.gsub(/[^a-z0-9\-]+/, '-').slice(0, Project::IDENTIFIER_MAX_LENGTH)
       end
     end
 
@@ -241,7 +241,7 @@ task :migrate_from_mantis => :environment do
       User.delete_all "login <> 'admin'"
       users_map = {}
       users_migrated = 0
-      MantisUser.find(:all).each do |user|
+      MantisUser.all.each do |user|
         u = User.new :firstname => encode(user.firstname),
                      :lastname => encode(user.lastname),
                      :mail => user.email,
@@ -263,7 +263,7 @@ task :migrate_from_mantis => :environment do
       projects_map = {}
       versions_map = {}
       categories_map = {}
-      MantisProject.find(:all).each do |project|
+      MantisProject.all.each do |project|
         p = Project.new :name => encode(project.name),
                         :description => encode(project.description)
         p.identifier = project.identifier
@@ -347,7 +347,7 @@ task :migrate_from_mantis => :environment do
         bug.bug_files.each do |file|
           a = Attachment.new :created_on => file.date_added
           a.file = file
-          a.author = User.find :first
+          a.author = User.first
           a.container = i
           a.save
         end
@@ -365,7 +365,7 @@ task :migrate_from_mantis => :environment do
 
       # Bug relationships
       print "Migrating bug relations"
-      MantisBugRelationship.find(:all).each do |relation|
+      MantisBugRelationship.all.each do |relation|
         next unless issues_map[relation.source_bug_id] && issues_map[relation.destination_bug_id]
         r = IssueRelation.new :relation_type => RELATION_TYPE_MAPPING[relation.relationship_type]
         r.issue_from = Issue.find_by_id(issues_map[relation.source_bug_id])
@@ -379,7 +379,7 @@ task :migrate_from_mantis => :environment do
       # News
       print "Migrating news"
       News.destroy_all
-      MantisNews.find(:all, :conditions => 'project_id > 0').each do |news|
+      MantisNews.where('project_id > 0').all.each do |news|
         next unless projects_map[news.project_id]
         n = News.new :project_id => projects_map[news.project_id],
                      :title => encode(news.headline[0..59]),
@@ -395,7 +395,7 @@ task :migrate_from_mantis => :environment do
       # Custom fields
       print "Migrating custom fields"
       IssueCustomField.destroy_all
-      MantisCustomField.find(:all).each do |field|
+      MantisCustomField.all.each do |field|
         f = IssueCustomField.new :name => field.name[0..29],
                                  :field_format => CUSTOM_FIELD_TYPE_MAPPING[field.format],
                                  :min_length => field.length_min,
@@ -407,7 +407,7 @@ task :migrate_from_mantis => :environment do
         print '.'
         STDOUT.flush
         # Trackers association
-        f.trackers = Tracker.find :all
+        f.trackers = Tracker.all
 
         # Projects association
         field.projects.each do |project|
@@ -440,9 +440,7 @@ task :migrate_from_mantis => :environment do
     end
 
     def self.encoding(charset)
-      @ic = Iconv.new('UTF-8', charset)
-    rescue Iconv::InvalidEncoding
-      return false
+      @charset = charset
     end
 
     def self.establish_connection(params)
@@ -454,9 +452,12 @@ task :migrate_from_mantis => :environment do
     end
 
     def self.encode(text)
-      @ic.iconv text
-    rescue
-      text
+      if RUBY_VERSION < '1.9'
+        @ic ||= Iconv.new('UTF-8', @charset)
+        @ic.iconv text
+      else
+        text.to_s.force_encoding(@charset).encode('UTF-8')
+      end
     end
   end
 
@@ -502,10 +503,20 @@ task :migrate_from_mantis => :environment do
   # Make sure bugs can refer bugs in other projects
   Setting.cross_project_issue_relations = 1 if Setting.respond_to? 'cross_project_issue_relations'
 
-  # Turn off email notifications
-  Setting.notified_events = []
+  old_notified_events = Setting.notified_events
+  old_password_min_length = Setting.password_min_length
+  begin
+    # Turn off email notifications temporarily
+    Setting.notified_events = []
+    Setting.password_min_length = 4
+    # Run the migration
+    MantisMigrate.establish_connection db_params
+    MantisMigrate.migrate
+  ensure
+    # Restore previous settings
+    Setting.notified_events = old_notified_events
+    Setting.password_min_length = old_password_min_length
+  end
 
-  MantisMigrate.establish_connection db_params
-  MantisMigrate.migrate
 end
 end

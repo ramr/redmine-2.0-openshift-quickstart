@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,6 +20,9 @@ require 'digest/sha1'
 
 class Repository::Cvs < Repository
   validates_presence_of :url, :root_url, :log_encoding
+
+  safe_attributes 'root_url',
+    :if => lambda {|repository, user| repository.new_record?}
 
   def self.human_attribute_name(attribute_key_name, *args)
     attr_name = attribute_key_name.to_s
@@ -66,6 +69,7 @@ class Repository::Cvs < Repository
         end
       end
     end
+    load_entries_changesets(entries)
     entries
   end
 
@@ -139,14 +143,11 @@ class Repository::Cvs < Repository
 	                           )
           cmt = Changeset.normalize_comments(revision.message, repo_log_encoding)
           author_utf8 = Changeset.to_utf8(revision.author, repo_log_encoding)
-          cs  = changesets.find(
-            :first,
-            :conditions => {
-                :committed_on => tmp_time - time_delta .. tmp_time + time_delta,
-                :committer    => author_utf8,
-                :comments     => cmt
-                }
-             )
+          cs  = changesets.where(
+                  :committed_on => tmp_time - time_delta .. tmp_time + time_delta,
+                  :committer    => author_utf8,
+                  :comments     => cmt
+                ).first
           # create a new changeset....
           unless cs
             # we use a temporaray revision number here (just for inserting)
@@ -181,10 +182,10 @@ class Repository::Cvs < Repository
       end
 
       # Renumber new changesets in chronological order
-      Changeset.all(
-              :order => 'committed_on ASC, id ASC',
-              :conditions => ["repository_id = ? AND revision LIKE 'tmp%'", id]
-           ).each do |changeset|
+      Changeset.
+        order('committed_on ASC, id ASC').
+        where("repository_id = ? AND revision LIKE 'tmp%'", id).
+        each do |changeset|
         changeset.update_attribute :revision, next_revision_number
       end
     end # transaction

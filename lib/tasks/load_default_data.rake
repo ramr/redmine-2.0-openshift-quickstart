@@ -2,6 +2,7 @@ desc 'Load Redmine default configuration data. Language is chosen interactively 
 
 namespace :redmine do
   task :load_default_data => :environment do
+    require 'custom_field'
     include Redmine::I18n
     set_language_if_valid('en')
 
@@ -26,9 +27,9 @@ namespace :redmine do
       Redmine::DefaultData::Loader.load(current_language)
       puts "Default configuration data loaded."
     rescue Redmine::DefaultData::DataAlreadyLoaded => error
-      puts error
+      puts error.message
     rescue => error
-      puts "Error: " + error
+      puts "Error: " + error.message
       puts "Default configuration data was not loaded."
     end
   end

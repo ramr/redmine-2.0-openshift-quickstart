@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,6 +18,10 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class SettingTest < ActiveSupport::TestCase
+
+  def teardown
+    Setting.clear_cache
+  end
 
   def test_read_default
     assert_equal "Redmine", Setting.app_title
@@ -42,16 +46,16 @@ class SettingTest < ActiveSupport::TestCase
     assert_equal ['issue_added', 'issue_updated', 'news_added'], Setting.notified_events
     assert_equal ['issue_added', 'issue_updated', 'news_added'], Setting.find_by_name('notified_events').value
   end
-  
+
   def test_setting_should_be_reloaded_after_clear_cache
     Setting.app_title = "My title"
     assert_equal "My title", Setting.app_title
-    
+
     s = Setting.find_by_name("app_title")
     s.value = 'New title'
     s.save!
     assert_equal "My title", Setting.app_title
-    
+
     Setting.clear_cache
     assert_equal "New title", Setting.app_title
   end

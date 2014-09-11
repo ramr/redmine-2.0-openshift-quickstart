@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,6 +16,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class Group < Principal
+  include Redmine::SafeAttributes
+
   has_and_belongs_to_many :users, :after_add => :user_added,
                                   :after_remove => :user_removed
 
@@ -23,15 +25,30 @@ class Group < Principal
 
   validates_presence_of :lastname
   validates_uniqueness_of :lastname, :case_sensitive => false
-  validates_length_of :lastname, :maximum => 30
+  validates_length_of :lastname, :maximum => 255
 
   before_destroy :remove_references_before_destroy
+
+  scope :sorted, lambda { order("#{table_name}.lastname ASC") }
+  scope :named, lambda {|arg| where("LOWER(#{table_name}.lastname) = LOWER(?)", arg.to_s.strip)}
+
+  safe_attributes 'name',
+    'user_ids',
+    'custom_field_values',
+    'custom_fields',
+    :if => lambda {|group, user| user.admin?}
 
   def to_s
     lastname.to_s
   end
 
-  alias :name :to_s
+  def name
+    lastname
+  end
+
+  def name=(arg)
+    self.lastname = arg
+  end
 
   def user_added(user)
     members.each do |member|
@@ -46,8 +63,11 @@ class Group < Principal
 
   def user_removed(user)
     members.each do |member|
-      MemberRole.find(:all, :include => :member,
-                            :conditions => ["#{Member.table_name}.user_id = ? AND #{MemberRole.table_name}.inherited_from IN (?)", user.id, member.member_role_ids]).each(&:destroy)
+      MemberRole.
+        includes(:member).
+        where("#{Member.table_name}.user_id = ? AND #{MemberRole.table_name}.inherited_from IN (?)", user.id, member.member_role_ids).
+        all.
+        each(&:destroy)
     end
   end
 

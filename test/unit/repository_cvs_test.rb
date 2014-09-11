@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -116,12 +116,12 @@ class RepositoryCvsTest < ActiveSupport::TestCase
       assert_equal CHANGESETS_NUM, @repository.changesets.count
 
       # Remove changesets with revision > 3
-      @repository.changesets.find(:all).each {|c| c.destroy if c.revision.to_i > 3}
+      @repository.changesets.all.each {|c| c.destroy if c.revision.to_i > 3}
       @project.reload
       assert_equal 3, @repository.changesets.count
       assert_equal %w|3 2 1|, @repository.changesets.all.collect(&:revision)
 
-      rev3_commit = @repository.changesets.find(:first, :order => 'committed_on DESC')
+      rev3_commit = @repository.changesets.reorder('committed_on DESC').first
       assert_equal '3', rev3_commit.revision
        # 2007-12-14 01:27:22 +0900
       rev3_committed_on = Time.gm(2007, 12, 13, 16, 27, 22)
@@ -158,6 +158,7 @@ class RepositoryCvsTest < ActiveSupport::TestCase
       @project.reload
       assert_equal CHANGESETS_NUM, @repository.changesets.count
       entries = @repository.entries('', '3')
+      assert_kind_of Redmine::Scm::Adapters::Entries, entries
       assert_equal 3, entries.size
       assert_equal entries[2].name, "README"
       assert_equal entries[2].lastrev.time, Time.gm(2007, 12, 13, 16, 27, 22)

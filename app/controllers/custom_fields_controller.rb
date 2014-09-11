@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -21,20 +21,28 @@ class CustomFieldsController < ApplicationController
   before_filter :require_admin
   before_filter :build_new_custom_field, :only => [:new, :create]
   before_filter :find_custom_field, :only => [:edit, :update, :destroy]
+  accept_api_auth :index
 
   def index
-    @custom_fields_by_type = CustomField.find(:all).group_by {|f| f.class.name }
-    @tab = params[:tab] || 'IssueCustomField'
+    respond_to do |format|
+      format.html {
+        @custom_fields_by_type = CustomField.all.group_by {|f| f.class.name }
+        @tab = params[:tab] || 'IssueCustomField'
+      }
+      format.api {
+        @custom_fields = CustomField.all
+      }
+    end
   end
 
   def new
   end
 
   def create
-    if request.post? and @custom_field.save
+    if @custom_field.save
       flash[:notice] = l(:notice_successful_create)
       call_hook(:controller_custom_fields_new_after_save, :params => params, :custom_field => @custom_field)
-      redirect_to :action => 'index', :tab => @custom_field.class.name
+      redirect_to custom_fields_path(:tab => @custom_field.class.name)
     else
       render :action => 'new'
     end
@@ -44,21 +52,22 @@ class CustomFieldsController < ApplicationController
   end
 
   def update
-    if request.put? and @custom_field.update_attributes(params[:custom_field])
+    if @custom_field.update_attributes(params[:custom_field])
       flash[:notice] = l(:notice_successful_update)
       call_hook(:controller_custom_fields_edit_after_save, :params => params, :custom_field => @custom_field)
-      redirect_to :action => 'index', :tab => @custom_field.class.name
+      redirect_to custom_fields_path(:tab => @custom_field.class.name)
     else
       render :action => 'edit'
     end
   end
 
   def destroy
-    @custom_field.destroy
-    redirect_to :action => 'index', :tab => @custom_field.class.name
-  rescue
-    flash[:error] = l(:error_can_not_delete_custom_field)
-    redirect_to :action => 'index'
+    begin
+      @custom_field.destroy
+    rescue
+      flash[:error] = l(:error_can_not_delete_custom_field)
+    end
+    redirect_to custom_fields_path(:tab => @custom_field.class.name)
   end
 
   private
@@ -67,6 +76,8 @@ class CustomFieldsController < ApplicationController
     @custom_field = CustomField.new_subclass_instance(params[:type], params[:custom_field])
     if @custom_field.nil?
       render_404
+    else
+      @custom_field.default_value = nil
     end
   end
 

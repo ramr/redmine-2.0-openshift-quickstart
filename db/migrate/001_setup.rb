@@ -1,4 +1,4 @@
-# redMine - project management software
+# Redmine - project management software
 # Copyright (C) 2006  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
@@ -292,7 +292,6 @@ class Setup < ActiveRecord::Migration
                        :lastname => "Admin",
                        :mail => "admin@example.net",
                        :mail_notification => true,
-                       :language => "en",
                        :status => 1
   end
 

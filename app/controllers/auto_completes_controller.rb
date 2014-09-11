@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,25 +20,25 @@ class AutoCompletesController < ApplicationController
 
   def issues
     @issues = []
-    q = params[:q].to_s
-    query = (params[:scope] == "all" && Setting.cross_project_issue_relations?) ? Issue : @project.issues
-    if q.match(/^\d+$/)
-      @issues << query.visible.find_by_id(q.to_i)
+    q = (params[:q] || params[:term]).to_s.strip
+    if q.present?
+      scope = (params[:scope] == "all" || @project.nil? ? Issue : @project.issues).visible
+      if q.match(/\A#?(\d+)\z/)
+        @issues << scope.find_by_id($1.to_i)
+      end
+      @issues += scope.where("LOWER(#{Issue.table_name}.subject) LIKE LOWER(?)", "%#{q}%").order("#{Issue.table_name}.id DESC").limit(10).all
+      @issues.compact!
     end
-    unless q.blank?
-      @issues += query.visible.find(:all, :conditions => ["LOWER(#{Issue.table_name}.subject) LIKE ?", "%#{q.downcase}%"], :limit => 10)
-    end
-    @issues.compact!
     render :layout => false
   end
 
   private
 
   def find_project
-    project_id = (params[:issue] && params[:issue][:project_id]) || params[:project_id]
-    @project = Project.find(project_id)
+    if params[:project_id].present?
+      @project = Project.find(params[:project_id])
+    end
   rescue ActiveRecord::RecordNotFound
     render_404
   end
-
 end

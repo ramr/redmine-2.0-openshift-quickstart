@@ -54,6 +54,9 @@ it:
       about_x_hours:
         one:  "circa un'ora"
         other: "circa %{count} ore"
+      x_hours:
+        one:   "1 ora"
+        other: "%{count} ore"
       x_days:
         one:  "1 giorno"
         other: "%{count} giorni"
@@ -131,6 +134,7 @@ it:
         not_same_project: "non appartiene allo stesso progetto"
         circular_dependency: "Questa relazione creerebbe una dipendenza circolare"
         cant_link_an_issue_with_a_descendant: "Una segnalazione non può essere collegata a una delle sue discendenti"
+        earlier_than_minimum_start_date: "cannot be earlier than %{date} because of preceding issues"
 
   actionview_instancetag_blank_option: Scegli
 
@@ -149,7 +153,6 @@ it:
   notice_account_invalid_creditentials: Nome utente o password non validi.
   notice_account_password_updated: La password è stata aggiornata.
   notice_account_wrong_password: Password errata
-  notice_account_register_done: L'utente è stato creato.
   notice_account_unknown_email: Utente sconosciuto.
   notice_can_t_change_password: Questo utente utilizza un metodo di autenticazione esterno. Impossibile cambiare la password.
   notice_account_lost_email_sent: Ti è stata spedita una email con le istruzioni per cambiare la password.
@@ -163,7 +166,7 @@ it:
   notice_not_authorized: Non sei autorizzato ad accedere a questa pagina.
   notice_email_sent: "Una email è stata spedita a %{value}"
   notice_email_error: "Si è verificato un errore durante l'invio di una email (%{value})"
-  notice_feeds_access_key_reseted: La tua chiave di accesso RSS è stata reimpostata.
+  notice_feeds_access_key_reseted: La tua chiave di accesso Atom è stata reimpostata.
 
   error_scm_not_found: "La risorsa e/o la versione non esistono nel repository."
   error_scm_command_failed: "Si è verificato un errore durante l'accesso al repository: %{value}"
@@ -173,8 +176,6 @@ it:
   mail_subject_register: "Attivazione utente %{value}"
   mail_body_register: "Per attivare l'utente, usa il seguente collegamento:"
 
-  gui_validation_error: 1 errore
-  gui_validation_error_plural: "%{count} errori"
 
   field_name: Nome
   field_description: Descrizione
@@ -353,8 +354,6 @@ it:
   label_text: Testo esteso
   label_attribute: Attributo
   label_attribute_plural: Attributi
-  label_download: "%{count} Download"
-  label_download_plural: "%{count} Download"
   label_no_data: Nessun dato disponibile
   label_change_status: Cambia stato
   label_history: Cronologia
@@ -442,8 +441,6 @@ it:
   label_day_plural: giorni
   label_repository: Repository
   label_browse: Sfoglia
-  label_modification: "%{count} modifica"
-  label_modification_plural: "%{count} modifiche"
   label_revision: Versione
   label_revision_plural: Versioni
   label_added: aggiunto
@@ -496,10 +493,10 @@ it:
   label_loading: Caricamento...
   label_relation_new: Nuova relazione
   label_relation_delete: Elimina relazione
-  label_relates_to: correlato a
-  label_duplicates: duplicati
-  label_blocks: blocchi
-  label_blocked_by: bloccato da
+  label_relates_to: correlata a
+  label_duplicates: duplica
+  label_blocks: blocca
+  label_blocked_by: bloccata da
   label_precedes: precede
   label_follows: segue
   label_end_to_start: fine a inizio
@@ -527,7 +524,7 @@ it:
   label_language_based: Basato sul linguaggio
   label_sort_by: "Ordina per %{value}"
   label_send_test_email: Invia una email di prova
-  label_feeds_access_key_created_on: "chiave di accesso RSS creata %{value} fa"
+  label_feeds_access_key_created_on: "chiave di accesso Atom creata %{value} fa"
   label_module_plural: Moduli
   label_added_time_by: "Aggiunto da %{author} %{age} fa"
   label_updated_time: "Aggiornato %{value} fa"
@@ -585,8 +582,8 @@ it:
   text_unallowed_characters: Caratteri non permessi
   text_comma_separated: Valori multipli permessi (separati da virgole).
   text_issues_ref_in_commit_messages: Segnalazioni di riferimento e chiusura nei messaggi di commit
-  text_issue_added: "E' stata segnalata l'anomalia %{id} da %{author}."
-  text_issue_updated: "L'anomalia %{id} è stata aggiornata da %{author}."
+  text_issue_added: "%{author} ha aggiunto la segnalazione %{id}."
+  text_issue_updated: "La segnalazione %{id} è stata aggiornata da %{author}."
   text_wiki_destroy_confirmation: Sicuro di voler eliminare questo wiki e tutti i suoi contenuti?
   text_issue_category_destroy_question: "Alcune segnalazioni (%{count}) risultano assegnate a questa categoria. Cosa vuoi fare ?"
   text_issue_category_destroy_assignments: Rimuovi le assegnazioni a questa categoria
@@ -723,7 +720,7 @@ it:
   mail_body_reminder: "%{count} segnalazioni che ti sono state assegnate scadranno nei prossimi %{days} giorni:"
   mail_subject_reminder: "%{count} segnalazioni in scadenza nei prossimi %{days} giorni"
   text_user_wrote: "%{value} ha scritto:"
-  label_duplicated_by: duplicato da
+  label_duplicated_by: duplicata da
   setting_enabled_scm: SCM abilitato
   text_enumeration_category_reassign_to: 'Riassegnale a questo valore:'
   text_enumeration_destroy_question: "%{count} oggetti hanno un assegnamento su questo valore."
@@ -755,7 +752,6 @@ it:
   permission_comment_news: Commenta notizie
   permission_delete_messages: Elimina messaggi
   permission_select_project_modules: Seleziona moduli progetto
-  permission_manage_documents: Gestisci documenti
   permission_edit_wiki_pages: Modifica pagine wiki
   permission_add_issue_watchers: Aggiungi osservatori
   permission_view_gantt: Vedi diagrammi gantt
@@ -878,11 +874,11 @@ it:
   label_revision_id: Revisione %{value}
   label_api_access_key: Chiave di accesso API
   label_api_access_key_created_on: Chiave di accesso API creata %{value} fa
-  label_feeds_access_key: Chiave di accesso RSS
+  label_feeds_access_key: Chiave di accesso Atom
   notice_api_access_key_reseted: La chiave di accesso API è stata reimpostata.
   setting_rest_api_enabled: Abilita il servizio web REST
   label_missing_api_access_key: Chiave di accesso API mancante
-  label_missing_feeds_access_key: Chiave di accesso RSS mancante
+  label_missing_feeds_access_key: Chiave di accesso Atom mancante
   button_show: Mostra
   text_line_separated: Valori multipli permessi (un valore per ogni riga).
   setting_mail_handler_body_delimiters: Tronca email dopo una di queste righe
@@ -918,7 +914,6 @@ it:
   project_module_gantt: Gantt
   project_module_calendar: Calendario
   button_edit_associated_wikipage: "Modifica la pagina wiki associata: %{page_title}"
-  text_are_you_sure_with_children: Eliminare la segnalazione e tutte le discendenti?
   field_text: Campo di testo
   label_user_mail_option_only_owner: Solo se io sono il proprietario
   setting_default_notification_option: Opzione di notifica predefinita
@@ -1006,29 +1001,102 @@ it:
   button_export: Esporta
   label_export_options: "%{export_format} opzioni per l'export"
   error_attachment_too_big: Questo file non può essere caricato in quanto la sua dimensione supera la massima consentita (%{max_size})
-  notice_failed_to_save_time_entries: "Failed to save %{count} time entrie(s) on %{total} selected: %{ids}."
+  notice_failed_to_save_time_entries: "Non ho potuto salvare %{count} registrazioni di tempo impiegato su %{total} selezionate: %{ids}."
   label_x_issues:
     zero:  0 segnalazione
     one:   1 segnalazione
     other: "%{count} segnalazioni"
-  label_repository_new: New repository
-  field_repository_is_default: Main repository
-  label_copy_attachments: Copy attachments
+  label_repository_new: Nuovo repository
+  field_repository_is_default: Repository principale
+  label_copy_attachments: Copia allegati
   label_item_position: "%{position}/%{count}"
   label_completed_versions: Completed versions
-  text_project_identifier_info: Only lower case letters (a-z), numbers, dashes and underscores are allowed.<br />Once saved, the identifier cannot be changed.
-  field_multiple: Multiple values
+  text_project_identifier_info: Consentiti solo lettere minuscole (a-z), numeri, trattini e trattini bassi.<br />Una volta salvato, l'identificatore non può essere modificato.
+  field_multiple: Valori multipli
   setting_commit_cross_project_ref: Allow issues of all the other projects to be referenced and fixed
-  text_issue_conflict_resolution_add_notes: Add my notes and discard my other changes
-  text_issue_conflict_resolution_overwrite: Apply my changes anyway (previous notes will be kept but some changes may be overwritten)
-  notice_issue_update_conflict: The issue has been updated by an other user while you were editing it.
-  text_issue_conflict_resolution_cancel: Discard all my changes and redisplay %{link}
-  permission_manage_related_issues: Manage related issues
-  field_ldap_filter: LDAP filter
-  label_search_for_watchers: Search for watchers to add
-  notice_account_deleted: Your account has been permanently deleted.
-  setting_unsubscribe: Allow users to delete their own account
-  button_delete_my_account: Delete my account
-  text_account_destroy_confirmation: |-
-    Are you sure you want to proceed?
-    Your account will be permanently deleted, with no way to reactivate it.
+  text_issue_conflict_resolution_add_notes: Aggiunge le mie note e non salvare le mie ulteriori modifiche
+  text_issue_conflict_resolution_overwrite: Applica comunque le mie modifiche (le note precedenti verranno mantenute ma alcuni cambiamenti potrebbero essere sovrascritti)
+  notice_issue_update_conflict: La segnalazione è stata aggiornata da un altro utente mentre la stavi editando.
+  text_issue_conflict_resolution_cancel: Cancella ogni modifica e rivisualizza %{link}
+  permission_manage_related_issues: Gestisci relative segnalazioni
+  field_auth_source_ldap_filter: Filtro LDAP
+  label_search_for_watchers: Cerca osservatori da aggiungere
+  notice_account_deleted: Il tuo account sarà definitivamente rimosso.
+  setting_unsubscribe: Consentire agli utenti di cancellare il proprio account
+  button_delete_my_account: Cancella il mio account
+  text_account_destroy_confirmation: "Sei sicuro di voler procedere?\nIl tuo account sarà definitivamente cancellato, senza alcuna possibilità di ripristino."
+  error_session_expired: "La tua sessione è scaduta. Effettua nuovamente il login."
+  text_session_expiration_settings: "Attenzione: la modifica di queste impostazioni può far scadere le sessioni correnti, compresa la tua."
+  setting_session_lifetime: Massima durata di una sessione
+  setting_session_timeout: Timeout di inattività di una sessione
+  label_session_expiration: Scadenza sessione
+  permission_close_project: Chiusura / riapertura progetto
+  label_show_closed_projects: Vedi progetti chiusi
+  button_close: Chiudi
+  button_reopen: Riapri
+  project_status_active: attivo
+  project_status_closed: chiuso
+  project_status_archived: archiviato
+  text_project_closed: Questo progetto è chiuso e in sola lettura.
+  notice_user_successful_create: Creato utente %{id}.
+  field_core_fields: Campi standard
+  field_timeout: Timeout (in secondi)
+  setting_thumbnails_enabled: Mostra miniature degli allegati
+  setting_thumbnails_size: Dimensioni delle miniature (in pixels)
+  label_status_transitions: Transizioni di stato
+  label_fields_permissions: Permessi sui campi
+  label_readonly: Sola lettura
+  label_required: Richiesto
+  text_repository_identifier_info: Consentiti solo lettere minuscole (a-z), numeri, trattini e trattini bassi.<br />Una volta salvato, ll'identificatore non può essere modificato.
+  field_board_parent: Parent forum
+  label_attribute_of_project: Project's %{name}
+  label_attribute_of_author: Author's %{name}
+  label_attribute_of_assigned_to: Assegnatari %{name}
+  label_attribute_of_fixed_version: Target version's %{name}
+  label_copy_subtasks: Copia sottoattività
+  label_copied_to: copia
+  label_copied_from: copiata da
+  label_any_issues_in_project: ogni segnalazione del progetto
+  label_any_issues_not_in_project: ogni segnalazione non nel progetto
+  field_private_notes: Note private
+  permission_view_private_notes: Visualizza note private
+  permission_set_notes_private: Imposta note come private
+  label_no_issues_in_project: progetto privo di segnalazioni
+  label_any: tutti
+  label_last_n_weeks: ultime %{count} settimane
+  setting_cross_project_subtasks: Consenti sottoattività cross-project
+  label_cross_project_descendants: Con sottoprogetti
+  label_cross_project_tree: Con progetto padre
+  label_cross_project_hierarchy: Con gerarchia progetto
+  label_cross_project_system: Con tutti i progetti
+  button_hide: Nascondi
+  setting_non_working_week_days: Giorni non lavorativi
+  label_in_the_next_days: nei prossimi
+  label_in_the_past_days: nei passati
+  label_attribute_of_user: Utente %{name}
+  text_turning_multiple_off: Disabilitando valori multipli, i valori multipli verranno rimossi, in modo da mantenere un solo valore per item.
+  label_attribute_of_issue: Segnalazione %{name}
+  permission_add_documents: Aggiungi documenti
+  permission_edit_documents: Edita documenti
+  permission_delete_documents: Cancella documenti
+  label_gantt_progress_line: Progress line
+  setting_jsonp_enabled: Abilita supporto a JSONP
+  field_inherit_members: Eredita membri
+  field_closed_on: Chiuso
+  field_generate_password: Generate password
+  setting_default_projects_tracker_ids: Trackers di default per nuovi progetti
+  label_total_time: Totale
+  notice_account_not_activated_yet: You haven't activated your account yet. If you want
+    to receive a new activation email, please <a href="%{url}">click this link</a>.
+  notice_account_locked: Your account is locked.
+  notice_account_register_done: Account was successfully created. An email containing
+    the instructions to activate your account was sent to %{email}.
+  label_hidden: Hidden
+  label_visibility_private: to me only
+  label_visibility_roles: to these roles only
+  label_visibility_public: to any users
+  field_must_change_passwd: Must change password at next logon
+  notice_new_password_must_be_different: The new password must be different from the
+    current password
+  setting_mail_handler_excluded_filenames: Exclude attachments by name
+  text_convert_available: ImageMagick convert available (optional)

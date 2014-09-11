@@ -1,24 +1,29 @@
-# encoding: utf-8
+# Redmine - project management software
+# Copyright (C) 2006-2013  Jean-Philippe Lang
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 require File.expand_path('../../../../../../test_helper', __FILE__)
 begin
-  require 'mocha'
+  require 'mocha/setup'
 
   class GitAdapterTest < ActiveSupport::TestCase
     REPOSITORY_PATH = Rails.root.join('tmp/test/git_repository').to_s
 
     FELIX_HEX  = "Felix Sch\xC3\xA4fer"
     CHAR_1_HEX = "\xc3\x9c"
-
-    ## Ruby uses ANSI api to fork a process on Windows.
-    ## Japanese Shift_JIS and Traditional Chinese Big5 have 0x5c(backslash) problem
-    ## and these are incompatible with ASCII.
-    ## Git for Windows (msysGit) changed internal API from ANSI to Unicode in 1.7.10
-    ## http://code.google.com/p/msysgit/issues/detail?id=80
-    ## So, Latin-1 path tests fail on Japanese Windows
-    WINDOWS_PASS = (Redmine::Platform.mswin? &&
-                       Redmine::Scm::Adapters::GitAdapter.client_version_above?([1, 7, 10]))
-    WINDOWS_SKIP_STR = "TODO: This test fails in Git for Windows above 1.7.10"
 
     ## Git, Mercurial and CVS path encodings are binary.
     ## Subversion supports URL encoding for path.
@@ -29,6 +34,16 @@ begin
     JRUBY_SKIP_STR = "TODO: This test fails in JRuby"
 
     if File.directory?(REPOSITORY_PATH)
+      ## Ruby uses ANSI api to fork a process on Windows.
+      ## Japanese Shift_JIS and Traditional Chinese Big5 have 0x5c(backslash) problem
+      ## and these are incompatible with ASCII.
+      ## Git for Windows (msysGit) changed internal API from ANSI to Unicode in 1.7.10
+      ## http://code.google.com/p/msysgit/issues/detail?id=80
+      ## So, Latin-1 path tests fail on Japanese Windows
+      WINDOWS_PASS = (Redmine::Platform.mswin? &&
+                      Redmine::Scm::Adapters::GitAdapter.client_version_above?([1, 7, 10]))
+      WINDOWS_SKIP_STR = "TODO: This test fails in Git for Windows above 1.7.10"
+
       def setup
         adapter_class = Redmine::Scm::Adapters::GitAdapter
         assert adapter_class
@@ -46,8 +61,10 @@ begin
                    )
         assert @adapter
         @char_1 = CHAR_1_HEX.dup
+        @str_felix_hex  = FELIX_HEX.dup
         if @char_1.respond_to?(:force_encoding)
           @char_1.force_encoding('UTF-8')
+          @str_felix_hex.force_encoding('ASCII-8BIT')
         end
       end
 
@@ -381,14 +398,10 @@ begin
       def test_last_rev_with_spaces_in_filename
         last_rev = @adapter.lastrev("filemane with spaces.txt",
                                     "ed5bb786bbda2dee66a2d50faf51429dbc043a7b")
-        str_felix_hex  = FELIX_HEX.dup
         last_rev_author = last_rev.author
-        if last_rev_author.respond_to?(:force_encoding)
-          last_rev_author.force_encoding('UTF-8')
-        end
         assert_equal "ed5bb786bbda2dee66a2d50faf51429dbc043a7b", last_rev.scmid
         assert_equal "ed5bb786bbda2dee66a2d50faf51429dbc043a7b", last_rev.identifier
-        assert_equal "#{str_felix_hex} <felix@fachschaften.org>",
+        assert_equal "#{@str_felix_hex} <felix@fachschaften.org>",
                        last_rev.author
         assert_equal "2010-09-18 19:59:46".to_time, last_rev.time
       end
@@ -408,6 +421,19 @@ begin
               assert @adapter.diff(p2, r1, r2)
             end
           end
+        end
+      end
+
+      def test_latin_1_user_annotate
+        ['83ca5fd546063a3c7dc2e568ba3355661a9e2b2c', '83ca5fd546063a'].each do |r1|
+          annotate = @adapter.annotate(" filename with a leading space.txt ", r1)
+          assert_kind_of Redmine::Scm::Adapters::Annotate, annotate
+          assert_equal 1, annotate.lines.size
+          assert_equal "And this is a file with a leading and trailing space...",
+                       annotate.lines[0].strip
+          assert_equal "83ca5fd546063a3c7dc2e568ba3355661a9e2b2c",
+                       annotate.revisions[0].identifier
+          assert_equal @str_felix_hex, annotate.revisions[0].author
         end
       end
 
@@ -445,6 +471,23 @@ begin
         assert_equal Time.gm(2009, 6, 19, 4, 37, 23), readme.lastrev.time
       end
 
+      def test_entries_wrong_path_encoding
+        adpt = Redmine::Scm::Adapters::GitAdapter.new(
+                      REPOSITORY_PATH,
+                      nil,
+                      nil,
+                      nil,
+                      'EUC-JP'
+                   )
+        entries1 = adpt.entries('latin-1-dir', '64f1f3e8')
+        assert entries1
+        assert_equal 3, entries1.size
+        f1 = entries1[1]
+        assert_equal nil, f1.name
+        assert_equal nil, f1.path
+        assert_equal 'file', f1.kind
+      end
+
       def test_entries_latin_1_files
         entries1 = @adapter.entries('latin-1-dir', '64f1f3e8')
         assert entries1
@@ -469,6 +512,37 @@ begin
           assert_equal "test-#{@char_1}-2.txt", f1.name
           assert_equal "latin-1-dir/test-#{@char_1}-subdir/test-#{@char_1}-2.txt", f1.path
           assert_equal 'file', f1.kind
+        end
+      end
+
+      def test_entry
+        entry = @adapter.entry()
+        assert_equal "", entry.path
+        assert_equal "dir", entry.kind
+        entry = @adapter.entry('')
+        assert_equal "", entry.path
+        assert_equal "dir", entry.kind
+        assert_nil @adapter.entry('invalid')
+        assert_nil @adapter.entry('/invalid')
+        assert_nil @adapter.entry('/invalid/')
+        assert_nil @adapter.entry('invalid/invalid')
+        assert_nil @adapter.entry('invalid/invalid/')
+        assert_nil @adapter.entry('/invalid/invalid')
+        assert_nil @adapter.entry('/invalid/invalid/')
+        ["README", "/README"].each do |path|
+          entry = @adapter.entry(path, '7234cb2750b63f')
+          assert_equal "README", entry.path
+          assert_equal "file", entry.kind
+        end
+        ["sources", "/sources", "/sources/"].each do |path|
+          entry = @adapter.entry(path, '7234cb2750b63f')
+          assert_equal "sources", entry.path
+          assert_equal "dir", entry.kind
+        end
+        ["sources/watchers_controller.rb", "/sources/watchers_controller.rb"].each do |path|
+          entry = @adapter.entry(path, '7234cb2750b63f')
+          assert_equal "sources/watchers_controller.rb", entry.path
+          assert_equal "file", entry.kind
         end
       end
 

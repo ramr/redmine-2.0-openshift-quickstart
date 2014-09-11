@@ -1,6 +1,5 @@
 I18n.default_locale = 'en'
-# Adds fallback to default locale for untranslated strings
-I18n::Backend::Simple.send(:include, I18n::Backend::Fallbacks)
+I18n.backend = Redmine::I18n::Backend.new
 
 require 'redmine'
 
@@ -8,6 +7,13 @@ require 'redmine'
 secret = Redmine::Configuration['secret_token']
 if secret.present?
   RedmineApp::Application.config.secret_token = secret
+end
+
+if Object.const_defined?(:OpenIdAuthentication)
+  openid_authentication_store = Redmine::Configuration['openid_authentication_store']
+  OpenIdAuthentication.store =
+    openid_authentication_store.present? ?
+      openid_authentication_store : :memory   
 end
 
 Redmine::Plugin.load

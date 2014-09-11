@@ -1,7 +1,7 @@
 # encoding: utf-8
 #
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -33,6 +33,10 @@ class MailHandlerTest < ActiveSupport::TestCase
   def setup
     ActionMailer::Base.deliveries.clear
     Setting.notified_events = Redmine::Notifiable.all.collect(&:name)
+  end
+
+  def teardown
+    Setting.clear_cache
   end
 
   def test_add_issue
@@ -173,9 +177,31 @@ class MailHandlerTest < ActiveSupport::TestCase
     assert !issue.new_record?
     issue.reload
     assert_equal 'New ticket with custom field values', issue.subject
-    assert_equal 'Value for a custom field',
-                 issue.custom_value_for(CustomField.find_by_name('Searchable field')).value
+    assert_equal 'PostgreSQL', issue.custom_field_value(1)
+    assert_equal 'Value for a custom field', issue.custom_field_value(2)
     assert !issue.description.match(/^searchable field:/i)
+  end
+
+  def test_add_issue_with_version_custom_fields
+    field = IssueCustomField.create!(:name => 'Affected version', :field_format => 'version', :is_for_all => true, :tracker_ids => [1,2,3])
+
+    issue = submit_email('ticket_with_custom_fields.eml', :issue => {:project => 'ecookbook'}) do |email|
+      email << "Affected version: 1.0\n"
+    end
+    assert issue.is_a?(Issue)
+    assert !issue.new_record?
+    issue.reload
+    assert_equal '2', issue.custom_field_value(field)
+  end
+
+  def test_add_issue_should_match_assignee_on_display_name
+    user = User.generate!(:firstname => 'Foo Bar', :lastname => 'Foo Baz')
+    User.add_to_project(user, Project.find(2))
+    issue = submit_email('ticket_on_given_project.eml') do |email|
+      email.sub!(/^Assigned to.*$/, 'Assigned to: Foo Bar Foo baz')
+    end
+    assert issue.is_a?(Issue)
+    assert_equal user, issue.assigned_to
   end
 
   def test_add_issue_with_cc
@@ -278,6 +304,51 @@ class MailHandlerTest < ActiveSupport::TestCase
     end
   end
 
+  def test_created_user_should_be_added_to_groups
+    group1 = Group.generate!
+    group2 = Group.generate!
+
+    assert_difference 'User.count' do
+      submit_email(
+        'ticket_by_unknown_user.eml',
+        :issue => {:project => 'ecookbook'},
+        :unknown_user => 'create',
+        :default_group => "#{group1.name},#{group2.name}"
+      )
+    end
+    user = User.order('id DESC').first
+    assert_same_elements [group1, group2], user.groups
+  end
+
+  def test_created_user_should_not_receive_account_information_with_no_account_info_option
+    assert_difference 'User.count' do
+      submit_email(
+        'ticket_by_unknown_user.eml',
+        :issue => {:project => 'ecookbook'},
+        :unknown_user => 'create',
+        :no_account_notice => '1'
+      )
+    end
+
+    # only 1 email for the new issue notification
+    assert_equal 1, ActionMailer::Base.deliveries.size
+    email = ActionMailer::Base.deliveries.first
+    assert_include 'Ticket by unknown user', email.subject
+  end
+
+  def test_created_user_should_have_mail_notification_to_none_with_no_notification_option
+    assert_difference 'User.count' do
+      submit_email(
+        'ticket_by_unknown_user.eml',
+        :issue => {:project => 'ecookbook'},
+        :unknown_user => 'create',
+        :no_notification => '1'
+      )
+    end
+    user = User.order('id DESC').first
+    assert_equal 'none', user.mail_notification
+  end
+
   def test_add_issue_without_from_header
     Role.anonymous.add_permission!(:add_issues)
     assert_equal false, submit_email('ticket_without_from_header.eml')
@@ -297,6 +368,15 @@ class MailHandlerTest < ActiveSupport::TestCase
     assert_equal 0, issue.done_ratio
     assert_equal 'Normal', issue.priority.to_s
     assert issue.description.include?('Lorem ipsum dolor sit amet, consectetuer adipiscing elit.')
+  end
+
+  def test_add_issue_with_invalid_project_should_be_assigned_to_default_project
+    issue = submit_email('ticket_on_given_project.eml', :issue => {:project => 'ecookbook'}, :allow_override => 'project') do |email|
+      email.gsub!(/^Project:.+$/, 'Project: invalid')
+    end
+    assert issue.is_a?(Issue)
+    assert !issue.new_record?
+    assert_equal 'ecookbook', issue.project.identifier
   end
 
   def test_add_issue_with_localized_attributes
@@ -347,13 +427,135 @@ class MailHandlerTest < ActiveSupport::TestCase
     assert_equal 'caaf384198bcbc9563ab5c058acd73cd', attachment.digest
   end
 
+  def test_thunderbird_with_attachment_ja
+    issue = submit_email(
+              'thunderbird_with_attachment_ja.eml',
+              :issue => {:project => 'ecookbook'}
+            )
+    assert_kind_of Issue, issue
+    assert_equal 1, issue.attachments.size
+    ja = "\xe3\x83\x86\xe3\x82\xb9\xe3\x83\x88.txt"
+    ja.force_encoding('UTF-8') if ja.respond_to?(:force_encoding)
+    attachment = issue.attachments.first
+    assert_equal ja, attachment.filename
+    assert_equal 5, attachment.filesize
+    assert File.exist?(attachment.diskfile)
+    assert_equal 5, File.size(attachment.diskfile)
+    assert_equal 'd8e8fca2dc0f896fd7cb4cb0031ba249', attachment.digest
+  end
+
+  def test_gmail_with_attachment_ja
+    issue = submit_email(
+              'gmail_with_attachment_ja.eml',
+              :issue => {:project => 'ecookbook'}
+            )
+    assert_kind_of Issue, issue
+    assert_equal 1, issue.attachments.size
+    ja = "\xe3\x83\x86\xe3\x82\xb9\xe3\x83\x88.txt"
+    ja.force_encoding('UTF-8') if ja.respond_to?(:force_encoding)
+    attachment = issue.attachments.first
+    assert_equal ja, attachment.filename
+    assert_equal 5, attachment.filesize
+    assert File.exist?(attachment.diskfile)
+    assert_equal 5, File.size(attachment.diskfile)
+    assert_equal 'd8e8fca2dc0f896fd7cb4cb0031ba249', attachment.digest
+  end
+
+  def test_thunderbird_with_attachment_latin1
+    issue = submit_email(
+              'thunderbird_with_attachment_iso-8859-1.eml',
+              :issue => {:project => 'ecookbook'}
+            )
+    assert_kind_of Issue, issue
+    assert_equal 1, issue.attachments.size
+    u = ""
+    u.force_encoding('UTF-8') if u.respond_to?(:force_encoding)
+    u1 = "\xc3\x84\xc3\xa4\xc3\x96\xc3\xb6\xc3\x9c\xc3\xbc"
+    u1.force_encoding('UTF-8') if u1.respond_to?(:force_encoding)
+    11.times { u << u1 }
+    attachment = issue.attachments.first
+    assert_equal "#{u}.png", attachment.filename
+    assert_equal 130, attachment.filesize
+    assert File.exist?(attachment.diskfile)
+    assert_equal 130, File.size(attachment.diskfile)
+    assert_equal '4d80e667ac37dddfe05502530f152abb', attachment.digest
+  end
+
+  def test_gmail_with_attachment_latin1
+    issue = submit_email(
+              'gmail_with_attachment_iso-8859-1.eml',
+              :issue => {:project => 'ecookbook'}
+            )
+    assert_kind_of Issue, issue
+    assert_equal 1, issue.attachments.size
+    u = ""
+    u.force_encoding('UTF-8') if u.respond_to?(:force_encoding)
+    u1 = "\xc3\x84\xc3\xa4\xc3\x96\xc3\xb6\xc3\x9c\xc3\xbc"
+    u1.force_encoding('UTF-8') if u1.respond_to?(:force_encoding)
+    11.times { u << u1 }
+    attachment = issue.attachments.first
+    assert_equal "#{u}.txt", attachment.filename
+    assert_equal 5, attachment.filesize
+    assert File.exist?(attachment.diskfile)
+    assert_equal 5, File.size(attachment.diskfile)
+    assert_equal 'd8e8fca2dc0f896fd7cb4cb0031ba249', attachment.digest
+  end
+
+  def test_multiple_inline_text_parts_should_be_appended_to_issue_description
+    issue = submit_email('multiple_text_parts.eml', :issue => {:project => 'ecookbook'})
+    assert_include 'first', issue.description
+    assert_include 'second', issue.description
+    assert_include 'third', issue.description
+  end
+
+  def test_attachment_text_part_should_be_added_as_issue_attachment
+    issue = submit_email('multiple_text_parts.eml', :issue => {:project => 'ecookbook'})
+    assert_not_include 'Plain text attachment', issue.description
+    attachment = issue.attachments.detect {|a| a.filename == 'textfile.txt'}
+    assert_not_nil attachment
+    assert_include 'Plain text attachment', File.read(attachment.diskfile)
+  end
+
   def test_add_issue_with_iso_8859_1_subject
     issue = submit_email(
               'subject_as_iso-8859-1.eml',
               :issue => {:project => 'ecookbook'}
             )
+    str = "Testmail from Webmail: \xc3\xa4 \xc3\xb6 \xc3\xbc..."
+    str.force_encoding('UTF-8') if str.respond_to?(:force_encoding)
     assert_kind_of Issue, issue
-    assert_equal 'Testmail from Webmail: ä ö ü...', issue.subject
+    assert_equal str, issue.subject
+  end
+
+  def test_add_issue_with_japanese_subject
+    issue = submit_email(
+              'subject_japanese_1.eml',
+              :issue => {:project => 'ecookbook'}
+            )
+    assert_kind_of Issue, issue
+    ja = "\xe3\x83\x86\xe3\x82\xb9\xe3\x83\x88"
+    ja.force_encoding('UTF-8') if ja.respond_to?(:force_encoding)
+    assert_equal ja, issue.subject
+  end
+
+  def test_add_issue_with_no_subject_header
+    issue = submit_email(
+              'no_subject_header.eml',
+              :issue => {:project => 'ecookbook'}
+            )
+    assert_kind_of Issue, issue
+    assert_equal '(no subject)', issue.subject
+  end
+
+  def test_add_issue_with_mixed_japanese_subject
+    issue = submit_email(
+              'subject_japanese_2.eml',
+              :issue => {:project => 'ecookbook'}
+            )
+    assert_kind_of Issue, issue
+    ja = "Re: \xe3\x83\x86\xe3\x82\xb9\xe3\x83\x88"
+    ja.force_encoding('UTF-8') if ja.respond_to?(:force_encoding)
+    assert_equal ja, issue.subject
   end
 
   def test_should_ignore_emails_from_locked_users
@@ -382,7 +584,8 @@ class MailHandlerTest < ActiveSupport::TestCase
     [
       "X-Auto-Response-Suppress: OOF",
       "Auto-Submitted: auto-replied",
-      "Auto-Submitted: Auto-Replied"
+      "Auto-Submitted: Auto-Replied",
+      "Auto-Submitted: auto-generated"
     ].each do |header|
       raw = IO.read(File.join(FIXTURES_PATH, 'ticket_on_given_project.eml'))
       raw = header + "\n" + raw
@@ -408,6 +611,7 @@ class MailHandlerTest < ActiveSupport::TestCase
     assert_equal User.find_by_login('jsmith'), journal.user
     assert_equal Issue.find(2), journal.journalized
     assert_match /This is reply/, journal.notes
+    assert_equal false, journal.private_notes
     assert_equal 'Feature request', journal.issue.tracker.name
   end
 
@@ -469,6 +673,20 @@ class MailHandlerTest < ActiveSupport::TestCase
     assert_equal 'Normal', journal.issue.priority.name
   end
 
+  def test_replying_to_a_private_note_should_add_reply_as_private
+    private_journal = Journal.create!(:notes => 'Private notes', :journalized => Issue.find(1), :private_notes => true, :user_id => 2)
+
+    assert_difference 'Journal.count' do
+      journal = submit_email('ticket_reply.eml') do |email|
+        email.sub! %r{^In-Reply-To:.*$}, "In-Reply-To: <redmine.journal-#{private_journal.id}.20060719210421@osiris>"
+      end
+
+      assert_kind_of Journal, journal
+      assert_match /This is reply/, journal.notes
+      assert_equal true, journal.private_notes
+    end
+  end
+
   def test_reply_to_a_message
     m = submit_email('message_reply.eml')
     assert m.is_a?(Message)
@@ -497,73 +715,73 @@ class MailHandlerTest < ActiveSupport::TestCase
     assert_equal 'This is a html-only email.', issue.description
   end
 
-  context "truncate emails based on the Setting" do
-    context "with no setting" do
-      setup do
-        Setting.mail_handler_body_delimiters = ''
-      end
-
-      should "add the entire email into the issue" do
-        issue = submit_email('ticket_on_given_project.eml')
-        assert_issue_created(issue)
-        assert issue.description.include?('---')
-        assert issue.description.include?('This paragraph is after the delimiter')
-      end
+  test "truncate emails with no setting should add the entire email into the issue" do
+    with_settings :mail_handler_body_delimiters => '' do
+      issue = submit_email('ticket_on_given_project.eml')
+      assert_issue_created(issue)
+      assert issue.description.include?('---')
+      assert issue.description.include?('This paragraph is after the delimiter')
     end
+  end
 
-    context "with a single string" do
-      setup do
-        Setting.mail_handler_body_delimiters = '---'
-      end
-      should "truncate the email at the delimiter for the issue" do
-        issue = submit_email('ticket_on_given_project.eml')
-        assert_issue_created(issue)
-        assert issue.description.include?('This paragraph is before delimiters')
-        assert issue.description.include?('--- This line starts with a delimiter')
-        assert !issue.description.match(/^---$/)
-        assert !issue.description.include?('This paragraph is after the delimiter')
-      end
+  test "truncate emails with a single string should truncate the email at the delimiter for the issue" do
+    with_settings :mail_handler_body_delimiters => '---' do
+      issue = submit_email('ticket_on_given_project.eml')
+      assert_issue_created(issue)
+      assert issue.description.include?('This paragraph is before delimiters')
+      assert issue.description.include?('--- This line starts with a delimiter')
+      assert !issue.description.match(/^---$/)
+      assert !issue.description.include?('This paragraph is after the delimiter')
     end
+  end
 
-    context "with a single quoted reply (e.g. reply to a Redmine email notification)" do
-      setup do
-        Setting.mail_handler_body_delimiters = '--- Reply above. Do not remove this line. ---'
-      end
-      should "truncate the email at the delimiter with the quoted reply symbols (>)" do
-        journal = submit_email('issue_update_with_quoted_reply_above.eml')
-        assert journal.is_a?(Journal)
-        assert journal.notes.include?('An update to the issue by the sender.')
-        assert !journal.notes.match(Regexp.escape("--- Reply above. Do not remove this line. ---"))
-        assert !journal.notes.include?('Looks like the JSON api for projects was missed.')
-      end
+  test "truncate emails with a single quoted reply should truncate the email at the delimiter with the quoted reply symbols (>)" do
+    with_settings :mail_handler_body_delimiters => '--- Reply above. Do not remove this line. ---' do
+      journal = submit_email('issue_update_with_quoted_reply_above.eml')
+      assert journal.is_a?(Journal)
+      assert journal.notes.include?('An update to the issue by the sender.')
+      assert !journal.notes.match(Regexp.escape("--- Reply above. Do not remove this line. ---"))
+      assert !journal.notes.include?('Looks like the JSON api for projects was missed.')
     end
+  end
 
-    context "with multiple quoted replies (e.g. reply to a reply of a Redmine email notification)" do
-      setup do
-        Setting.mail_handler_body_delimiters = '--- Reply above. Do not remove this line. ---'
-      end
-      should "truncate the email at the delimiter with the quoted reply symbols (>)" do
-        journal = submit_email('issue_update_with_multiple_quoted_reply_above.eml')
-        assert journal.is_a?(Journal)
-        assert journal.notes.include?('An update to the issue by the sender.')
-        assert !journal.notes.match(Regexp.escape("--- Reply above. Do not remove this line. ---"))
-        assert !journal.notes.include?('Looks like the JSON api for projects was missed.')
-      end
+  test "truncate emails with multiple quoted replies should truncate the email at the delimiter with the quoted reply symbols (>)" do
+    with_settings :mail_handler_body_delimiters => '--- Reply above. Do not remove this line. ---' do
+      journal = submit_email('issue_update_with_multiple_quoted_reply_above.eml')
+      assert journal.is_a?(Journal)
+      assert journal.notes.include?('An update to the issue by the sender.')
+      assert !journal.notes.match(Regexp.escape("--- Reply above. Do not remove this line. ---"))
+      assert !journal.notes.include?('Looks like the JSON api for projects was missed.')
     end
+  end
 
-    context "with multiple strings" do
-      setup do
-        Setting.mail_handler_body_delimiters = "---\nBREAK"
-      end
-      should "truncate the email at the first delimiter found (BREAK)" do
-        issue = submit_email('ticket_on_given_project.eml')
-        assert_issue_created(issue)
-        assert issue.description.include?('This paragraph is before delimiters')
-        assert !issue.description.include?('BREAK')
-        assert !issue.description.include?('This paragraph is between delimiters')
-        assert !issue.description.match(/^---$/)
-        assert !issue.description.include?('This paragraph is after the delimiter')
-      end
+  test "truncate emails with multiple strings should truncate the email at the first delimiter found (BREAK)" do
+    with_settings :mail_handler_body_delimiters => "---\nBREAK" do
+      issue = submit_email('ticket_on_given_project.eml')
+      assert_issue_created(issue)
+      assert issue.description.include?('This paragraph is before delimiters')
+      assert !issue.description.include?('BREAK')
+      assert !issue.description.include?('This paragraph is between delimiters')
+      assert !issue.description.match(/^---$/)
+      assert !issue.description.include?('This paragraph is after the delimiter')
+    end
+  end
+
+  def test_attachments_that_match_mail_handler_excluded_filenames_should_be_ignored
+    with_settings :mail_handler_excluded_filenames => '*.vcf, *.jpg' do
+      issue = submit_email('ticket_with_attachment.eml', :issue => {:project => 'onlinestore'})
+      assert issue.is_a?(Issue)
+      assert !issue.new_record?
+      assert_equal 0, issue.reload.attachments.size
+    end
+  end
+
+  def test_attachments_that_do_not_match_mail_handler_excluded_filenames_should_be_attached
+    with_settings :mail_handler_excluded_filenames => '*.vcf, *.gif' do
+      issue = submit_email('ticket_with_attachment.eml', :issue => {:project => 'onlinestore'})
+      assert issue.is_a?(Issue)
+      assert !issue.new_record?
+      assert_equal 1, issue.reload.attachments.size
     end
   end
 
@@ -592,14 +810,7 @@ class MailHandlerTest < ActiveSupport::TestCase
       assert_equal expected[0], user.login
       assert_equal expected[1], user.firstname
       assert_equal expected[2], user.lastname
-    end
-  end
-
-  def test_new_user_from_attributes_should_respect_minimum_password_length
-    with_settings :password_min_length => 15 do
-      user = MailHandler.new_user_from_attributes('jsmith@example.net')
-      assert user.valid?
-      assert user.password.length >= 15
+      assert_equal 'only_my_events', user.mail_notification
     end
   end
 
@@ -627,6 +838,19 @@ class MailHandlerTest < ActiveSupport::TestCase
     str2.force_encoding('UTF-8') if str2.respond_to?(:force_encoding)
     assert_equal str1, user.firstname
     assert_equal str2, user.lastname
+  end
+
+  def test_extract_options_from_env_should_return_options
+    options = MailHandler.extract_options_from_env({
+      'tracker' => 'defect',
+      'project' => 'foo',
+      'unknown_user' => 'create'
+    })
+
+    assert_equal({
+      :issue => {:tracker => 'defect', :project => 'foo'},
+      :unknown_user => 'create'
+    }, options)
   end
 
   private

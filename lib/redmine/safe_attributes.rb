@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -31,7 +31,11 @@ module Redmine
       def safe_attributes(*args)
         @safe_attributes ||= []
         if args.empty?
-          @safe_attributes
+          if superclass.include?(Redmine::SafeAttributes)
+            @safe_attributes + superclass.safe_attributes 
+          else
+            @safe_attributes
+          end
         else
           options = args.last.is_a?(Hash) ? args.pop : {}
           @safe_attributes << [args, options]

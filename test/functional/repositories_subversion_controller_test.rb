@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -185,6 +185,13 @@ class RepositoriesSubversionControllerTest < ActionController::TestCase
       end
     end
 
+    def test_entry_should_send_images_inline
+      get :entry, :id => PRJ_ID,
+          :path => repository_path_hash(['subversion_test', 'folder', 'subfolder', 'rubylogo.gif'])[:param]
+      assert_response :success
+      assert_equal 'inline; filename="rubylogo.gif"', response.headers['Content-Disposition']
+    end
+
     def test_entry_at_given_revision
       assert_equal 0, @repository.changesets.count
       @repository.fetch_changesets
@@ -240,18 +247,15 @@ class RepositoriesSubversionControllerTest < ActionController::TestCase
       get :revision, :id => 1, :rev => 2
       assert_response :success
       assert_template 'revision'
-      assert_tag :tag => 'ul',
-                 :child => { :tag => 'li',
-                             # link to the entry at rev 2
-                             :child => { :tag => 'a',
-                                         :attributes => {:href => '/projects/ecookbook/repository/revisions/2/entry/test/some/path/in/the/repo'},
-                                         :content => 'repo',
-                                         # link to partial diff
-                                         :sibling =>  { :tag => 'a',
-                                                        :attributes => { :href => '/projects/ecookbook/repository/revisions/2/diff/test/some/path/in/the/repo' }
-                                                       }
-                                        }
-                            }
+
+      assert_select 'ul' do
+        assert_select 'li' do
+          # link to the entry at rev 2
+          assert_select 'a[href=?]', '/projects/ecookbook/repository/revisions/2/entry/test/some/path/in/the/repo', :text => 'repo'
+          # link to partial diff
+          assert_select 'a[href=?]', '/projects/ecookbook/repository/revisions/2/diff/test/some/path/in/the/repo'
+        end
+      end
     end
 
     def test_invalid_revision
@@ -291,18 +295,15 @@ class RepositoriesSubversionControllerTest < ActionController::TestCase
       get :revision, :id => 1, :rev => 2
       assert_response :success
       assert_template 'revision'
-      assert_tag :tag => 'ul',
-                 :child => { :tag => 'li',
-                             # link to the entry at rev 2
-                             :child => { :tag => 'a',
-                                         :attributes => {:href => '/projects/ecookbook/repository/revisions/2/entry/path/in/the/repo'},
-                                         :content => 'repo',
-                                         # link to partial diff
-                                         :sibling =>  { :tag => 'a',
-                                                        :attributes => { :href => '/projects/ecookbook/repository/revisions/2/diff/path/in/the/repo' }
-                                                       }
-                                        }
-                            }
+
+      assert_select 'ul' do
+        assert_select 'li' do
+          # link to the entry at rev 2
+          assert_select 'a[href=?]', '/projects/ecookbook/repository/revisions/2/entry/path/in/the/repo', :text => 'repo'
+          # link to partial diff
+          assert_select 'a[href=?]', '/projects/ecookbook/repository/revisions/2/diff/path/in/the/repo'
+        end
+      end
     end
 
     def test_revision_diff
@@ -314,8 +315,8 @@ class RepositoriesSubversionControllerTest < ActionController::TestCase
         get :diff, :id => PRJ_ID, :rev => 3, :type => dt
         assert_response :success
         assert_template 'diff'
-        assert_tag :tag => 'h2',
-                   :content => / 3/
+        assert_select 'h2', :text => /Revision 3/
+        assert_select 'th.filename', :text => 'subversion_test/textfile.txt'
       end
     end
 
@@ -325,10 +326,10 @@ class RepositoriesSubversionControllerTest < ActionController::TestCase
       @project.reload
       assert_equal NUM_REV, @repository.changesets.count
 
-      get :diff, :id => PRJ_ID, :rev => 3, :format => 'diff'
+      get :diff, :id => PRJ_ID, :rev => 5, :format => 'diff'
       assert_response :success
       assert_equal 'text/x-patch', @response.content_type
-      assert_equal 'Index: subversion_test/textfile.txt', @response.body.split(/\r?\n/).first
+      assert_equal 'Index: subversion_test/folder/greeter.rb', @response.body.split(/\r?\n/).first
     end
 
     def test_directory_diff
@@ -360,6 +361,19 @@ class RepositoriesSubversionControllerTest < ActionController::TestCase
           :path => repository_path_hash(['subversion_test', 'helloworld.c'])[:param]
       assert_response :success
       assert_template 'annotate'
+
+      assert_select 'tr' do
+        assert_select 'th.line-num', :text => '1'
+        assert_select 'td.revision', :text => '4'
+        assert_select 'td.author', :text => 'jp'
+        assert_select 'td', :text => /stdio.h/
+      end
+      # Same revision
+      assert_select 'tr' do
+        assert_select 'th.line-num', :text => '2'
+        assert_select 'td.revision', :text => ''
+        assert_select 'td.author', :text => ''
+      end
     end
 
     def test_annotate_at_given_revision

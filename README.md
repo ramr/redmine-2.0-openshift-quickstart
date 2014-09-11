@@ -1,44 +1,32 @@
 Redmine on OpenShift
 =========================
- 
+
 Redmine is a flexible project management web application. Written using Ruby on Rails framework, it is cross-platform and cross-database.
 
 Redmine is open source and released under the terms of the GNU General Public License v2 (GPL).
 
-More information can be found on the official Redmine set (www.redmine.org)
+More information can be found at www.redmine.org
+
 Running on OpenShift
 --------------------
 
-Create an account at http://openshift.redhat.com/
+Create an account at https://www.openshift.com
 
-Create a ruby application (ruby-1.8 or ruby-1.9)
+Create a ruby application
 
-	rhc app create -a redmine -t ruby-1.9  # or ruby-1.8
+	rhc app create redmine ruby-1.9 mysql-5.1 
 
-Add mysql support to your application
-    
-	rhc app cartridge add -a redmine -c mysql-5.1
+Make a note of the username, password, and host name as you will need to use these to login to the mysql database.
 
-Make a note of the username, password, and host name as you will need to use these to login to the mysql database
+The current version of Redmine based on Rails 3.2 which is not supported
+on the Ruby 2.0 cartridge ([Rails#10877](https://github.com/rails/rails/issues/10877)).
+Until Rails 4 version of Redmine is not released, you can try some of the community [forks](https://github.com/marutosi/redmine/tree/rails4.0.20140608-0).
 
 Add this upstream Redmine quickstart repo
 
 	cd redmine
-	git remote add upstream -m master git://github.com/openshift/redmine-2.0-openshift-quickstart.git
+	git remote add upstream -m master git://github.com/openshift/openshift-redmine-quickstart.git
 	git pull -s recursive -X theirs upstream master
-
-In order to be able to upload files attached to issues, you should add a
-"files" directory/folder
-
-	mkdir files
-
-and remove the line /files/* from .gitignore to push that directory/folder
-to all the gears (where your OpenShift application is running).
-
-Alternatively, you can ssh to all the serving gears for your application
-and create a directory/folder called "files" under redmine/repo
-
-	mkdir redmine/repo/files
 
 Then push the repo upstream
 
@@ -62,3 +50,6 @@ the password for the Redmine admin user - see the Change password link at:
 
 	http://redmine-$yournamespace.rhcloud.com/my/account
 
+Version
+-----------------------------------
+Redmine 2.4

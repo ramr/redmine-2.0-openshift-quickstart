@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -81,6 +81,11 @@ class RepositoryMercurialTest < ActiveSupport::TestCase
       assert_equal true, klass.scm_available
     end
 
+    def test_entries
+      entries = @repository.entries
+      assert_kind_of Redmine::Scm::Adapters::Entries, entries
+    end
+
     def test_fetch_changesets_from_scratch
       assert_equal 0, @repository.changesets.count
       @repository.fetch_changesets
@@ -97,7 +102,7 @@ class RepositoryMercurialTest < ActiveSupport::TestCase
       @project.reload
       assert_equal NUM_REV, @repository.changesets.count
       # Remove changesets with revision > 2
-      @repository.changesets.find(:all).each {|c| c.destroy if c.revision.to_i > 2}
+      @repository.changesets.all.each {|c| c.destroy if c.revision.to_i > 2}
       @project.reload
       assert_equal 3, @repository.changesets.count
 

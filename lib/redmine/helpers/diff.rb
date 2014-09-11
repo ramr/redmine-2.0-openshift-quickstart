@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+require 'diff'
 
 module Redmine
   module Helpers
@@ -50,16 +52,17 @@ module Redmine
               words_add += 1
             else
               del_at = pos unless del_at
-              deleted << ' ' + h(change[2])
+              deleted << ' ' unless deleted.empty?
+              deleted << h(change[2])
               words_del  += 1
             end
           end
           if add_at
-            words[add_at] = '<span class="diff_in">' + words[add_at]
-            words[add_to] = words[add_to] + '</span>'
+            words[add_at] = '<span class="diff_in">'.html_safe + words[add_at]
+            words[add_to] = words[add_to] + '</span>'.html_safe
           end
           if del_at
-            words.insert del_at - del_off + dels + words_add, '<span class="diff_out">' + deleted + '</span>'
+            words.insert del_at - del_off + dels + words_add, '<span class="diff_out">'.html_safe + deleted + '</span>'.html_safe
             dels += 1
             del_off += words_del
             words_del = 0

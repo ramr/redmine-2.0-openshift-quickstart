@@ -8,6 +8,7 @@ roles_001:
     --- 
     - :add_project
     - :edit_project
+    - :close_project
     - :select_project_modules
     - :manage_members
     - :manage_versions
@@ -23,6 +24,8 @@ roles_001:
     - :view_issue_watchers
     - :add_issue_watchers
     - :set_issues_private
+    - :set_notes_private
+    - :view_private_notes
     - :delete_issue_watchers
     - :manage_public_queries
     - :save_queries
@@ -35,7 +38,9 @@ roles_001:
     - :manage_news
     - :comment_news
     - :view_documents
-    - :manage_documents
+    - :add_documents
+    - :edit_documents
+    - :delete_documents
     - :view_wiki_pages
     - :export_wiki_pages
     - :view_wiki_edits
@@ -86,7 +91,9 @@ roles_002:
     - :manage_news
     - :comment_news
     - :view_documents
-    - :manage_documents
+    - :add_documents
+    - :edit_documents
+    - :delete_documents
     - :view_wiki_pages
     - :view_wiki_edits
     - :edit_wiki_pages
@@ -128,7 +135,9 @@ roles_003:
     - :manage_news
     - :comment_news
     - :view_documents
-    - :manage_documents
+    - :add_documents
+    - :edit_documents
+    - :delete_documents
     - :view_wiki_pages
     - :view_wiki_edits
     - :edit_wiki_pages
@@ -160,7 +169,6 @@ roles_004:
     - :view_time_entries
     - :comment_news
     - :view_documents
-    - :manage_documents
     - :view_wiki_pages
     - :view_wiki_edits
     - :edit_wiki_pages

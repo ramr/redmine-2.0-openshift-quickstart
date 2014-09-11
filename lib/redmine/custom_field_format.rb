@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -68,6 +68,13 @@ module Redmine
           custom_field_format = Redmine::CustomFieldFormat.new(*args)
         end
         @@available[custom_field_format.name] = custom_field_format unless @@available.keys.include?(custom_field_format.name)
+      end
+
+      def delete(format)
+        if format.is_a?(Redmine::CustomFieldFormat)
+          format = format.name
+        end
+        @@available.delete(format)
       end
 
       def available_formats

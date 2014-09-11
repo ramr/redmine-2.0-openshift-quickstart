@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -21,7 +21,7 @@ class Redmine::MenuManager::MenuHelperTest < ActionView::TestCase
 
   include Redmine::MenuManager::MenuHelper
   include ERB::Util
-  fixtures :users, :members, :projects, :enabled_modules
+  fixtures :users, :members, :projects, :enabled_modules, :roles, :member_roles
 
   def setup
     setup_with_controller

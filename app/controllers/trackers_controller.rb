@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -25,30 +25,30 @@ class TrackersController < ApplicationController
   def index
     respond_to do |format|
       format.html {
-        @tracker_pages, @trackers = paginate :trackers, :per_page => 10, :order => 'position'
+        @tracker_pages, @trackers = paginate Tracker.sorted, :per_page => 25
         render :action => "index", :layout => false if request.xhr?
       }
       format.api {
-        @trackers = Tracker.all
+        @trackers = Tracker.sorted.all
       }
     end
   end
 
   def new
     @tracker ||= Tracker.new(params[:tracker])
-    @trackers = Tracker.find :all, :order => 'position'
-    @projects = Project.find(:all)
+    @trackers = Tracker.sorted.all
+    @projects = Project.all
   end
 
   def create
     @tracker = Tracker.new(params[:tracker])
-    if request.post? and @tracker.save
+    if @tracker.save
       # workflow copy
       if !params[:copy_workflow_from].blank? && (copy_from = Tracker.find_by_id(params[:copy_workflow_from]))
-        @tracker.workflows.copy(copy_from)
+        @tracker.workflow_rules.copy(copy_from)
       end
       flash[:notice] = l(:notice_successful_create)
-      redirect_to :action => 'index'
+      redirect_to trackers_path
       return
     end
     new
@@ -57,14 +57,14 @@ class TrackersController < ApplicationController
 
   def edit
     @tracker ||= Tracker.find(params[:id])
-    @projects = Project.find(:all)
+    @projects = Project.all
   end
-  
+
   def update
     @tracker = Tracker.find(params[:id])
-    if request.put? and @tracker.update_attributes(params[:tracker])
+    if @tracker.update_attributes(params[:tracker])
       flash[:notice] = l(:notice_successful_update)
-      redirect_to :action => 'index'
+      redirect_to trackers_path
       return
     end
     edit
@@ -78,6 +78,24 @@ class TrackersController < ApplicationController
     else
       @tracker.destroy
     end
-    redirect_to :action => 'index'
+    redirect_to trackers_path
+  end
+
+  def fields
+    if request.post? && params[:trackers]
+      params[:trackers].each do |tracker_id, tracker_params|
+        tracker = Tracker.find_by_id(tracker_id)
+        if tracker
+          tracker.core_fields = tracker_params[:core_fields]
+          tracker.custom_field_ids = tracker_params[:custom_field_ids]
+          tracker.save
+        end
+      end
+      flash[:notice] = l(:notice_successful_update)
+      redirect_to fields_trackers_path
+      return
+    end
+    @trackers = Tracker.sorted.all
+    @custom_fields = IssueCustomField.all.sort
   end
 end

@@ -50,6 +50,9 @@ sr:
       about_x_hours:
         one:   "приближно један сат"
         other: "приближно %{count} сати"
+      x_hours:
+        one:   "1 сат"
+        other: "%{count} сати"
       x_days:
         one:   "један дан"
         other: "%{count} дана"
@@ -127,6 +130,7 @@ sr:
         not_same_project: "не припада истом пројекту"
         circular_dependency: "Ова веза ће створити кружну референцу"
         cant_link_an_issue_with_a_descendant: "Проблем не може бити повезан са једним од својих подзадатака"
+        earlier_than_minimum_start_date: "cannot be earlier than %{date} because of preceding issues"
 
   actionview_instancetag_blank_option: Молим одаберите
 
@@ -134,7 +138,7 @@ sr:
   general_text_Yes: 'Да'
   general_text_no: 'не'
   general_text_yes: 'да'
-  general_lang_name: 'Српски'
+  general_lang_name: 'Serbian Cyrillic (Српски)'
   general_csv_separator: ','
   general_csv_decimal_separator: '.'
   general_csv_encoding: UTF-8
@@ -159,7 +163,7 @@ sr:
   notice_not_authorized: Нисте овлашћени за приступ овој страни.
   notice_email_sent: "E-порука је послата на %{value}"
   notice_email_error: "Догодила се грешка приликом слања е-поруке (%{value})"
-  notice_feeds_access_key_reseted: Ваш RSS приступни кључ је поништен.
+  notice_feeds_access_key_reseted: Ваш Atom приступни кључ је поништен.
   notice_api_access_key_reseted: Ваш API приступни кључ је поништен.
   notice_failed_to_save_issues: "Неуспешно снимање %{count} проблема од %{total} одабраних: %{ids}."
   notice_failed_to_save_members: "Неуспешно снимање члана(ова): %{errors}."
@@ -204,8 +208,6 @@ sr:
   mail_subject_wiki_content_updated: "Wiki страница '%{id}' је ажурирана"
   mail_body_wiki_content_updated: "%{author} је ажурирао wiki страницу '%{id}'."
 
-  gui_validation_error: једна грешка
-  gui_validation_error_plural: "%{count} грешака"
 
   field_name: Назив
   field_description: Опис
@@ -382,7 +384,6 @@ sr:
   permission_edit_own_time_entries: Измена сопственог утрошеног времена
   permission_manage_news: Управљање вестима
   permission_comment_news: Коментарисање вести
-  permission_manage_documents: Управљање документима
   permission_view_documents: Прегледање докумената
   permission_manage_files: Управљање датотекама
   permission_view_files: Прегледање датотека
@@ -505,8 +506,6 @@ sr:
   label_text: Дуги текст
   label_attribute: Особина
   label_attribute_plural: Особине
-  label_download: "%{count} преузимање"
-  label_download_plural: "%{count} преузимања"
   label_no_data: Нема података за приказивање
   label_change_status: Промена статуса
   label_history: Историја
@@ -609,8 +608,6 @@ sr:
   label_repository: Спремиште
   label_repository_plural: Спремишта
   label_browse: Прегледање
-  label_modification: "%{count} промена"
-  label_modification_plural: "%{count} промена"
   label_branch: Грана
   label_tag: Ознака
   label_revision: Ревизија
@@ -706,9 +703,9 @@ sr:
   label_language_based: Базирано на језику корисника
   label_sort_by: "Сортирано по %{value}"
   label_send_test_email: Слање пробне е-поруке
-  label_feeds_access_key: RSS приступни кључ
-  label_missing_feeds_access_key: RSS приступни кључ недостаје
-  label_feeds_access_key_created_on: "RSS приступни кључ је направљен пре %{value}"
+  label_feeds_access_key: Atom приступни кључ
+  label_missing_feeds_access_key: Atom приступни кључ недостаје
+  label_feeds_access_key_created_on: "Atom приступни кључ је направљен пре %{value}"
   label_module_plural: Модули
   label_added_time_by: "Додао %{author} пре %{age}"
   label_updated_time_by: "Ажурирао %{author} пре %{age}"
@@ -918,7 +915,6 @@ sr:
   project_module_calendar: Календар
 
   button_edit_associated_wikipage: "Edit associated Wiki page: %{page_title}"
-  text_are_you_sure_with_children: Delete issue and all child issues?
   field_text: Text field
   label_user_mail_option_only_owner: Only for things I am the owner of
   setting_default_notification_option: Default notification option
@@ -931,7 +927,6 @@ sr:
   label_principal_search: "Search for user or group:"
   label_user_search: "Search for user:"
   field_visible: Visible
-  setting_emails_header: Emails header
   setting_commit_logtime_activity_id: Activity for logged time
   text_time_logged_by_changeset: Applied in changeset %{value}.
   setting_commit_logtime_enabled: Enable time logging
@@ -972,8 +967,6 @@ sr:
   text_scm_command: Command
   text_scm_command_version: Version
   label_git_report_last_commit: Report last commit for files and directories
-  text_scm_config: You can configure your scm commands in config/configuration.yml. Please restart the application after editing it.
-  text_scm_command_not_available: Scm command is not available. Please check settings on the administration panel.
   notice_issue_successful_create: Issue %{id} created.
   label_between: between
   setting_issue_group_assignment: Allow issue assignment to groups
@@ -1024,7 +1017,7 @@ sr:
   notice_issue_update_conflict: The issue has been updated by an other user while you were editing it.
   text_issue_conflict_resolution_cancel: Discard all my changes and redisplay %{link}
   permission_manage_related_issues: Manage related issues
-  field_ldap_filter: LDAP filter
+  field_auth_source_ldap_filter: LDAP filter
   label_search_for_watchers: Search for watchers to add
   notice_account_deleted: Your account has been permanently deleted.
   setting_unsubscribe: Allow users to delete their own account
@@ -1032,3 +1025,80 @@ sr:
   text_account_destroy_confirmation: |-
     Are you sure you want to proceed?
     Your account will be permanently deleted, with no way to reactivate it.
+  error_session_expired: Your session has expired. Please login again.
+  text_session_expiration_settings: "Warning: changing these settings may expire the current sessions including yours."
+  setting_session_lifetime: Session maximum lifetime
+  setting_session_timeout: Session inactivity timeout
+  label_session_expiration: Session expiration
+  permission_close_project: Close / reopen the project
+  label_show_closed_projects: View closed projects
+  button_close: Close
+  button_reopen: Reopen
+  project_status_active: active
+  project_status_closed: closed
+  project_status_archived: archived
+  text_project_closed: This project is closed and read-only.
+  notice_user_successful_create: User %{id} created.
+  field_core_fields: Standard fields
+  field_timeout: Timeout (in seconds)
+  setting_thumbnails_enabled: Display attachment thumbnails
+  setting_thumbnails_size: Thumbnails size (in pixels)
+  label_status_transitions: Status transitions
+  label_fields_permissions: Fields permissions
+  label_readonly: Read-only
+  label_required: Required
+  text_repository_identifier_info: Only lower case letters (a-z), numbers, dashes and underscores are allowed.<br />Once saved, the identifier cannot be changed.
+  field_board_parent: Parent forum
+  label_attribute_of_project: Project's %{name}
+  label_attribute_of_author: Author's %{name}
+  label_attribute_of_assigned_to: Assignee's %{name}
+  label_attribute_of_fixed_version: Target version's %{name}
+  label_copy_subtasks: Copy subtasks
+  label_copied_to: copied to
+  label_copied_from: copied from
+  label_any_issues_in_project: any issues in project
+  label_any_issues_not_in_project: any issues not in project
+  field_private_notes: Private notes
+  permission_view_private_notes: View private notes
+  permission_set_notes_private: Set notes as private
+  label_no_issues_in_project: no issues in project
+  label_any: сви
+  label_last_n_weeks: last %{count} weeks
+  setting_cross_project_subtasks: Allow cross-project subtasks
+  label_cross_project_descendants: Са потпројектима
+  label_cross_project_tree: Са стаблом пројекта
+  label_cross_project_hierarchy: Са хијерархијом пројекта
+  label_cross_project_system: Са свим пројектима
+  button_hide: Hide
+  setting_non_working_week_days: Non-working days
+  label_in_the_next_days: in the next
+  label_in_the_past_days: in the past
+  label_attribute_of_user: User's %{name}
+  text_turning_multiple_off: If you disable multiple values, multiple values will be
+    removed in order to preserve only one value per item.
+  label_attribute_of_issue: Issue's %{name}
+  permission_add_documents: Add documents
+  permission_edit_documents: Edit documents
+  permission_delete_documents: Delete documents
+  label_gantt_progress_line: Progress line
+  setting_jsonp_enabled: Enable JSONP support
+  field_inherit_members: Inherit members
+  field_closed_on: Closed
+  field_generate_password: Generate password
+  setting_default_projects_tracker_ids: Default trackers for new projects
+  label_total_time: Укупно
+  text_scm_config: You can configure your SCM commands in config/configuration.yml. Please restart the application after editing it.
+  text_scm_command_not_available: SCM command is not available. Please check settings on the administration panel.
+  setting_emails_header: Email header
+  notice_account_not_activated_yet: You haven't activated your account yet. If you want
+    to receive a new activation email, please <a href="%{url}">click this link</a>.
+  notice_account_locked: Your account is locked.
+  label_hidden: Hidden
+  label_visibility_private: to me only
+  label_visibility_roles: to these roles only
+  label_visibility_public: to any users
+  field_must_change_passwd: Must change password at next logon
+  notice_new_password_must_be_different: The new password must be different from the
+    current password
+  setting_mail_handler_excluded_filenames: Exclude attachments by name
+  text_convert_available: ImageMagick convert available (optional)

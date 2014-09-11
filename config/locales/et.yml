@@ -66,6 +66,9 @@ et:
       about_x_hours:
         one:   "umbes tund"
         other: "umbes %{count} tundi"
+      x_hours:
+        one:   "1 tund"
+        other: "%{count} tundi"
       x_days:
         one:   "1 päev"
         other: "%{count} päeva"
@@ -143,6 +146,7 @@ et:
         not_same_project: "ei kuulu sama projekti juurde"
         circular_dependency: "See suhe looks vastastikuse sõltuvuse"
         cant_link_an_issue_with_a_descendant: "Teemat ei saa sidustada tema enda alamteemaga"
+        earlier_than_minimum_start_date: "cannot be earlier than %{date} because of preceding issues"
 
   actionview_instancetag_blank_option: "Palun vali"
 
@@ -176,7 +180,7 @@ et:
   notice_not_authorized_archived_project: "See projekt on arhiveeritud."
   notice_email_sent: "%{value}-le saadeti kiri"
   notice_email_error: "Kirja saatmisel tekkis viga (%{value})"
-  notice_feeds_access_key_reseted: "Sinu RSS juurdepääsuvõti nulliti."
+  notice_feeds_access_key_reseted: "Sinu Atom juurdepääsuvõti nulliti."
   notice_api_access_key_reseted: "Sinu API juurdepääsuvõti nulliti."
   notice_failed_to_save_issues: "%{count} teemat %{total}-st ei õnnestunud salvestada: %{ids}."
   notice_failed_to_save_time_entries: "%{count} ajakulu kannet %{total}-st ei õnnestunud salvestada: %{ids}."
@@ -228,8 +232,6 @@ et:
   mail_subject_wiki_content_updated: "Uuendati '%{id}' vikilehte"
   mail_body_wiki_content_updated: "'%{id}' vikilehte uuendati %{author} poolt."
 
-  gui_validation_error: "1 viga"
-  gui_validation_error_plural: "%{count} viga"
 
   field_name: "Nimi"
   field_description: "Kirjeldus"
@@ -339,7 +341,7 @@ et:
   field_cvs_module: "Moodul"
   field_repository_is_default: "Peamine hoidla"
   field_multiple: "Korraga mitu väärtust"
-  field_ldap_filter: "LDAP filter"
+  field_auth_source_ldap_filter: "LDAP filter"
 
   setting_app_title: "Veebilehe pealkiri"
   setting_app_subtitle: "Veebilehe alampealkiri"
@@ -435,7 +437,6 @@ et:
   permission_edit_own_time_entries: "Omi ajakulu kandeid muuta"
   permission_manage_news: "Uudiseid hallata"
   permission_comment_news: "Uudiseid kommenteerida"
-  permission_manage_documents: "Dokumente hallata"
   permission_view_documents: "Dokumente näha"
   permission_manage_files: "Faile hallata"
   permission_view_files: "Faile näha"
@@ -566,8 +567,6 @@ et:
   label_text: "Pikk tekst"
   label_attribute: "Atribuut"
   label_attribute_plural: "Atribuudid"
-  label_download: "%{count} allalaadimine"
-  label_download_plural: "%{count} allalaadimist"
   label_no_data: "Pole"
   label_change_status: "Muuda olekut"
   label_history: "Ajalugu"
@@ -678,8 +677,6 @@ et:
   label_repository_new: "Uus hoidla"
   label_repository_plural: "Hoidlad"
   label_browse: "Sirvi"
-  label_modification: "%{count} muudatus"
-  label_modification_plural: "%{count} muudatust"
   label_branch: "Haru"
   label_tag: "Sildiga"
   label_revision: "Sissekanne"
@@ -776,9 +773,9 @@ et:
   label_language_based: "Kasutaja keele põhjal"
   label_sort_by: "Sorteeri %{value} järgi"
   label_send_test_email: "Saada kontrollkiri"
-  label_feeds_access_key: "RSS juurdepääsuvõti"
-  label_missing_feeds_access_key: "RSS juurdepääsuvõti on puudu"
-  label_feeds_access_key_created_on: "RSS juurdepääsuvõti loodi %{value} tagasi"
+  label_feeds_access_key: "Atom juurdepääsuvõti"
+  label_missing_feeds_access_key: "Atom juurdepääsuvõti on puudu"
+  label_feeds_access_key_created_on: "Atom juurdepääsuvõti loodi %{value} tagasi"
   label_module_plural: "Moodulid"
   label_added_time_by: "Lisatud %{author} poolt %{age} tagasi"
   label_updated_time_by: "Uuendatud %{author} poolt %{age} tagasi"
@@ -932,7 +929,6 @@ et:
   text_subprojects_destroy_warning: "Alamprojekt(id) - %{value} - kustutatakse samuti."
   text_workflow_edit: "Töövoo muutmiseks vali roll ja valdkond"
   text_are_you_sure: "Oled Sa kindel?"
-  text_are_you_sure_with_children: "Kustutada teema ja kõik tema alamteemad?"
   text_journal_changed: "%{label} muudetud %{old} -> %{new}"
   text_journal_changed_no_detail: "%{label} uuendatud"
   text_journal_set_to: "%{label} uus väärtus on %{value}"
@@ -1044,3 +1040,77 @@ et:
   description_date_range_interval: "Vali vahemik algus- ja lõpukuupäeva abil"
   description_date_from: "Sisesta alguskuupäev"
   description_date_to: "Sisesta lõpukuupäev"
+  error_session_expired: Your session has expired. Please login again.
+  text_session_expiration_settings: "Warning: changing these settings may expire the current sessions including yours."
+  setting_session_lifetime: Session maximum lifetime
+  setting_session_timeout: Session inactivity timeout
+  label_session_expiration: Session expiration
+  permission_close_project: Close / reopen the project
+  label_show_closed_projects: View closed projects
+  button_close: Close
+  button_reopen: Reopen
+  project_status_active: active
+  project_status_closed: closed
+  project_status_archived: archived
+  text_project_closed: This project is closed and read-only.
+  notice_user_successful_create: User %{id} created.
+  field_core_fields: Standard fields
+  field_timeout: Timeout (in seconds)
+  setting_thumbnails_enabled: Display attachment thumbnails
+  setting_thumbnails_size: Thumbnails size (in pixels)
+  label_status_transitions: Status transitions
+  label_fields_permissions: Fields permissions
+  label_readonly: Read-only
+  label_required: Required
+  text_repository_identifier_info: "Lubatud on ainult väikesed tähed (a-z), numbrid ja kriipsud.<br />Peale salvestamist ei saa tunnust enam muuta."
+  field_board_parent: Parent forum
+  label_attribute_of_project: Project's %{name}
+  label_attribute_of_author: Author's %{name}
+  label_attribute_of_assigned_to: Assignee's %{name}
+  label_attribute_of_fixed_version: Target version's %{name}
+  label_copy_subtasks: Copy subtasks
+  label_copied_to: copied to
+  label_copied_from: copied from
+  label_any_issues_in_project: any issues in project
+  label_any_issues_not_in_project: any issues not in project
+  field_private_notes: Private notes
+  permission_view_private_notes: View private notes
+  permission_set_notes_private: Set notes as private
+  label_no_issues_in_project: no issues in project
+  label_any: "kõik"
+  label_last_n_weeks: last %{count} weeks
+  setting_cross_project_subtasks: Allow cross-project subtasks
+  label_cross_project_descendants: "alamprojektidega"
+  label_cross_project_tree: "projektipuuga"
+  label_cross_project_hierarchy: "projektihierarhiaga"
+  label_cross_project_system: "kõigi projektidega"
+  button_hide: Hide
+  setting_non_working_week_days: Non-working days
+  label_in_the_next_days: in the next
+  label_in_the_past_days: in the past
+  label_attribute_of_user: User's %{name}
+  text_turning_multiple_off: If you disable multiple values, multiple values will be
+    removed in order to preserve only one value per item.
+  label_attribute_of_issue: Issue's %{name}
+  permission_add_documents: Add documents
+  permission_edit_documents: Edit documents
+  permission_delete_documents: Delete documents
+  label_gantt_progress_line: Progress line
+  setting_jsonp_enabled: Enable JSONP support
+  field_inherit_members: Inherit members
+  field_closed_on: Closed
+  field_generate_password: Generate password
+  setting_default_projects_tracker_ids: Default trackers for new projects
+  label_total_time: "Kokku"
+  notice_account_not_activated_yet: You haven't activated your account yet. If you want
+    to receive a new activation email, please <a href="%{url}">click this link</a>.
+  notice_account_locked: Your account is locked.
+  label_hidden: Hidden
+  label_visibility_private: to me only
+  label_visibility_roles: to these roles only
+  label_visibility_public: to any users
+  field_must_change_passwd: Must change password at next logon
+  notice_new_password_must_be_different: The new password must be different from the
+    current password
+  setting_mail_handler_excluded_filenames: Exclude attachments by name
+  text_convert_available: ImageMagick convert available (optional)

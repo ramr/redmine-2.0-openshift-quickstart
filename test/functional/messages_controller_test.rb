@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,18 +16,11 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 require File.expand_path('../../test_helper', __FILE__)
-require 'messages_controller'
-
-# Re-raise errors caught by the controller.
-class MessagesController; def rescue_action(e) raise e end; end
 
 class MessagesControllerTest < ActionController::TestCase
   fixtures :projects, :users, :members, :member_roles, :roles, :boards, :messages, :enabled_modules
 
   def setup
-    @controller = MessagesController.new
-    @request    = ActionController::TestRequest.new
-    @response   = ActionController::TestResponse.new
     User.current = nil
   end
 
@@ -81,6 +74,11 @@ class MessagesControllerTest < ActionController::TestCase
     assert_response 404
   end
 
+  def test_show_message_from_invalid_board_should_respond_with_404
+    get :show, :board_id => 999, :id => 1
+    assert_response 404
+  end
+
   def test_get_new
     @request.session[:user_id] = 2
     get :new, :board_id => 1
@@ -88,14 +86,21 @@ class MessagesControllerTest < ActionController::TestCase
     assert_template 'new'
   end
 
+  def test_get_new_with_invalid_board
+    @request.session[:user_id] = 2
+    get :new, :board_id => 99
+    assert_response 404
+  end
+
   def test_post_new
     @request.session[:user_id] = 2
     ActionMailer::Base.deliveries.clear
-    Setting.notified_events = ['message_posted']
 
-    post :new, :board_id => 1,
+    with_settings :notified_events => %w(message_posted) do
+      post :new, :board_id => 1,
                :message => { :subject => 'Test created message',
                              :content => 'Message body'}
+    end
     message = Message.find_by_subject('Test created message')
     assert_not_nil message
     assert_redirected_to "/boards/1/topics/#{message.to_param}"
@@ -158,7 +163,7 @@ class MessagesControllerTest < ActionController::TestCase
   def test_reply
     @request.session[:user_id] = 2
     post :reply, :board_id => 1, :id => 1, :reply => { :content => 'This is a test reply', :subject => 'Test reply' }
-    reply = Message.find(:first, :order => 'id DESC')
+    reply = Message.order('id DESC').first
     assert_redirected_to "/boards/1/topics/1?r=#{reply.id}"
     assert Message.find_by_subject('Test reply')
   end
@@ -185,7 +190,10 @@ class MessagesControllerTest < ActionController::TestCase
     @request.session[:user_id] = 2
     xhr :get, :quote, :board_id => 1, :id => 3
     assert_response :success
-    assert_select_rjs :show, 'reply'
+    assert_equal 'text/javascript', response.content_type
+    assert_template 'quote'
+    assert_include 'RE: First post', response.body
+    assert_include '> An other reply', response.body
   end
 
   def test_preview_new

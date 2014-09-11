@@ -1,6 +1,23 @@
+# Redmine - project management software
+# Copyright (C) 2006-2013  Jean-Philippe Lang
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 require File.expand_path('../../../../../../test_helper', __FILE__)
 begin
-  require 'mocha'
+  require 'mocha/setup'
 
   class CvsAdapterTest < ActiveSupport::TestCase
     REPOSITORY_PATH = Rails.root.join('tmp/test/cvs_repository').to_s
@@ -60,6 +77,22 @@ begin
                                   ""
                                 )
         assert_equal "UTF-8", adpt2.path_encoding
+      end
+
+      def test_root_url_path
+        to_test = {
+          ':pserver:cvs_user:cvs_password@123.456.789.123:9876/repo' => '/repo',
+          ':pserver:cvs_user:cvs_password@123.456.789.123/repo' => '/repo',
+          ':pserver:cvs_user:cvs_password@cvs_server:/repo' => '/repo',
+          ':pserver:cvs_user:cvs_password@cvs_server:9876/repo' => '/repo',
+          ':pserver:cvs_user:cvs_password@cvs_server/repo' => '/repo',
+          ':pserver:cvs_user:cvs_password@cvs_server/path/repo' => '/path/repo',
+          ':ext:cvsservername:/path' => '/path'
+        }
+
+        to_test.each do |string, expected|
+          assert_equal expected, Redmine::Scm::Adapters::CvsAdapter.new('foo', string).send(:root_url_path), "#{string} failed"
+        end
       end
 
       private
