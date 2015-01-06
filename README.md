@@ -24,7 +24,7 @@ Make a note of the username, password, and host name as you will need to use the
 Add this upstream Redmine quickstart repo
 
 	cd redmine
-	git remote add upstream -m master git://github.com/openshift/redmine-2.0-openshift-quickstart.git
+	git remote add upstream -m master git://github.com/ramr/redmine-2.0-openshift-quickstart.git
 	git pull -s recursive -X theirs upstream master
 
 In order to be able to upload files attached to issues, you should add a
