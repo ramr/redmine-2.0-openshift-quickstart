@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,6 +19,10 @@ class ScmFetchError < Exception; end
 
 class Repository < ActiveRecord::Base
   include Redmine::Ciphering
+  include Redmine::SafeAttributes
+
+  # Maximum length for repository identifiers
+  IDENTIFIER_MAX_LENGTH = 255
 
   belongs_to :project
   has_many :changesets, :order => "#{Changeset.table_name}.committed_on DESC, #{Changeset.table_name}.id DESC"
@@ -33,14 +37,24 @@ class Repository < ActiveRecord::Base
   before_destroy :clear_changesets
 
   validates_length_of :password, :maximum => 255, :allow_nil => true
-  validates_length_of :identifier, :maximum => 255, :allow_blank => true
+  validates_length_of :identifier, :maximum => IDENTIFIER_MAX_LENGTH, :allow_blank => true
   validates_presence_of :identifier, :unless => Proc.new { |r| r.is_default? || r.set_as_default? }
   validates_uniqueness_of :identifier, :scope => :project_id, :allow_blank => true
-  validates_exclusion_of :identifier, :in => %w(show entry raw changes annotate diff show stats graph)
-  # donwcase letters, digits, dashes but not digits only
-  validates_format_of :identifier, :with => /^(?!\d+$)[a-z0-9\-]*$/, :allow_blank => true
+  validates_exclusion_of :identifier, :in => %w(browse show entry raw changes annotate diff statistics graph revisions revision)
+  # donwcase letters, digits, dashes, underscores but not digits only
+  validates_format_of :identifier, :with => /\A(?!\d+$)[a-z0-9\-_]*\z/, :allow_blank => true
   # Checks if the SCM is enabled when creating a repository
   validate :repo_create_validation, :on => :create
+
+  safe_attributes 'identifier',
+    'login',
+    'password',
+    'path_encoding',
+    'log_encoding',
+    'is_default'
+
+  safe_attributes 'url',
+    :if => lambda {|repository, user| repository.new_record?}
 
   def repo_create_validation
     unless Setting.enabled_scm.include?(self.class.name.demodulize)
@@ -103,6 +117,14 @@ class Repository < ActiveRecord::Base
     end
   end
 
+  def identifier=(identifier)
+    super unless identifier_frozen?
+  end
+
+  def identifier_frozen?
+    errors[:identifier].blank? && !(new_record? || identifier.blank?)
+  end
+
   def identifier_param
     if is_default?
       nil
@@ -129,6 +151,12 @@ class Repository < ActiveRecord::Base
     else
       find_by_identifier(param)
     end
+  end
+
+  # TODO: should return an empty hash instead of nil to avoid many ||{}
+  def extra_info
+    h = read_attribute(:extra_info)
+    h.is_a?(Hash) ? h : nil
   end
 
   def merge_extra_info(arg)
@@ -166,8 +194,15 @@ class Repository < ActiveRecord::Base
     scm.entry(path, identifier)
   end
 
-  def entries(path=nil, identifier=nil)
+  def scm_entries(path=nil, identifier=nil)
     scm.entries(path, identifier)
+  end
+  protected :scm_entries
+
+  def entries(path=nil, identifier=nil)
+    entries = scm_entries(path, identifier)
+    load_entries_changesets(entries)
+    entries
   end
 
   def branches
@@ -210,31 +245,33 @@ class Repository < ActiveRecord::Base
   def find_changeset_by_name(name)
     return nil if name.blank?
     s = name.to_s
-    changesets.find(:first, :conditions => (s.match(/^\d*$/) ?
-          ["revision = ?", s] : ["revision LIKE ?", s + '%']))
+    if s.match(/^\d*$/)
+      changesets.where("revision = ?", s).first
+    else
+      changesets.where("revision LIKE ?", s + '%').first
+    end
   end
 
   def latest_changeset
-    @latest_changeset ||= changesets.find(:first)
+    @latest_changeset ||= changesets.first
   end
 
   # Returns the latest changesets for +path+
   # Default behaviour is to search in cached changesets
   def latest_changesets(path, rev, limit=10)
     if path.blank?
-      changesets.find(
-         :all,
-         :include => :user,
-         :order => "#{Changeset.table_name}.committed_on DESC, #{Changeset.table_name}.id DESC",
-         :limit => limit)
+      changesets.
+        reorder("#{Changeset.table_name}.committed_on DESC, #{Changeset.table_name}.id DESC").
+        limit(limit).
+        preload(:user).
+        all
     else
-      filechanges.find(
-         :all,
-         :include => {:changeset => :user},
-         :conditions => ["path = ?", path.with_leading_slash],
-         :order => "#{Changeset.table_name}.committed_on DESC, #{Changeset.table_name}.id DESC",
-         :limit => limit
-       ).collect(&:changeset)
+      filechanges.
+        where("path = ?", path.with_leading_slash).
+        reorder("#{Changeset.table_name}.committed_on DESC, #{Changeset.table_name}.id DESC").
+        limit(limit).
+        preload(:changeset => :user).
+        collect(&:changeset)
     end
   end
 
@@ -255,9 +292,8 @@ class Repository < ActiveRecord::Base
         new_user_id = h[committer]
         if new_user_id && (new_user_id.to_i != user_id.to_i)
           new_user_id = (new_user_id.to_i > 0 ? new_user_id.to_i : nil)
-          Changeset.update_all(
-               "user_id = #{ new_user_id.nil? ? 'NULL' : new_user_id }",
-               ["repository_id = ? AND committer = ?", id, committer])
+          Changeset.where(["repository_id = ? AND committer = ?", id, committer]).
+            update_all("user_id = #{new_user_id.nil? ? 'NULL' : new_user_id}")
         end
       end
       @committers            = nil
@@ -277,7 +313,7 @@ class Repository < ActiveRecord::Base
       return @found_committer_users[committer] if @found_committer_users.has_key?(committer)
 
       user = nil
-      c = changesets.find(:first, :conditions => {:committer => committer}, :include => :user)
+      c = changesets.where(:committer => committer).includes(:user).first
       if c && c.user
         user = c.user
       elsif committer.strip =~ /^([^<]+)(<(.*)>)?$/
@@ -313,7 +349,7 @@ class Repository < ActiveRecord::Base
 
   # scan changeset comments to find related and fixed issues for all repositories
   def self.scan_changesets_for_issue_ids
-    find(:all).each(&:scan_changesets_for_issue_ids)
+    all.each(&:scan_changesets_for_issue_ids)
   end
 
   def self.scm_name
@@ -366,7 +402,56 @@ class Repository < ActiveRecord::Base
   end
 
   def set_as_default?
-    new_record? && project && !Repository.first(:conditions => {:project_id => project.id})
+    new_record? && project && Repository.where(:project_id => project.id).empty?
+  end
+
+  # Returns a hash with statistics by author in the following form:
+  # {
+  #   "John Smith" => { :commits => 45, :changes => 324 },
+  #   "Bob" => { ... }
+  # }
+  #
+  # Notes:
+  # - this hash honnors the users mapping defined for the repository
+  def stats_by_author
+    commits = Changeset.where("repository_id = ?", id).select("committer, user_id, count(*) as count").group("committer, user_id")
+
+    #TODO: restore ordering ; this line probably never worked
+    #commits.to_a.sort! {|x, y| x.last <=> y.last}
+
+    changes = Change.joins(:changeset).where("#{Changeset.table_name}.repository_id = ?", id).select("committer, user_id, count(*) as count").group("committer, user_id")
+
+    user_ids = changesets.map(&:user_id).compact.uniq
+    authors_names = User.where(:id => user_ids).inject({}) do |memo, user|
+      memo[user.id] = user.to_s
+      memo
+    end
+
+    (commits + changes).inject({}) do |hash, element|
+      mapped_name = element.committer
+      if username = authors_names[element.user_id.to_i]
+        mapped_name = username
+      end
+      hash[mapped_name] ||= { :commits_count => 0, :changes_count => 0 }
+      if element.is_a?(Changeset)
+        hash[mapped_name][:commits_count] += element.count.to_i
+      else
+        hash[mapped_name][:changes_count] += element.count.to_i
+      end
+      hash
+    end
+  end
+
+  # Returns a scope of changesets that come from the same commit as the given changeset
+  # in different repositories that point to the same backend
+  def same_commits_in_scope(scope, changeset)
+    scope = scope.joins(:repository).where(:repositories => {:url => url, :root_url => root_url, :type => type})
+    if changeset.scmid.present?
+      scope = scope.where(:scmid => changeset.scmid)
+    else
+      scope = scope.where(:revision => changeset.revision)
+    end
+    scope
   end
 
   protected
@@ -376,7 +461,17 @@ class Repository < ActiveRecord::Base
       self.is_default = true
     end
     if is_default? && is_default_changed?
-      Repository.update_all(["is_default = ?", false], ["project_id = ?", project_id])
+      Repository.where(["project_id = ?", project_id]).update_all(["is_default = ?", false])
+    end
+  end
+
+  def load_entries_changesets(entries)
+    if entries
+      entries.each do |entry|
+        if entry.lastrev && entry.lastrev.identifier
+          entry.changeset = find_changeset_by_name(entry.lastrev.identifier)
+        end
+      end
     end
   end
 
@@ -384,7 +479,7 @@ class Repository < ActiveRecord::Base
 
   # Deletes repository data
   def clear_changesets
-    cs = Changeset.table_name 
+    cs = Changeset.table_name
     ch = Change.table_name
     ci = "#{table_name_prefix}changesets_issues#{table_name_suffix}"
     cp = "#{table_name_prefix}changeset_parents#{table_name_suffix}"
@@ -393,5 +488,9 @@ class Repository < ActiveRecord::Base
     connection.delete("DELETE FROM #{ci} WHERE #{ci}.changeset_id IN (SELECT #{cs}.id FROM #{cs} WHERE #{cs}.repository_id = #{id})")
     connection.delete("DELETE FROM #{cp} WHERE #{cp}.changeset_id IN (SELECT #{cs}.id FROM #{cs} WHERE #{cs}.repository_id = #{id})")
     connection.delete("DELETE FROM #{cs} WHERE #{cs}.repository_id = #{id}")
+    clear_extra_info_of_changesets
+  end
+
+  def clear_extra_info_of_changesets
   end
 end

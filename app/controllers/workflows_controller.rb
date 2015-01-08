@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,41 +19,29 @@ class WorkflowsController < ApplicationController
   layout 'admin'
 
   before_filter :require_admin
-  before_filter :find_roles
-  before_filter :find_trackers
 
   def index
-    @workflow_counts = Workflow.count_by_tracker_and_role
+    @workflow_counts = WorkflowTransition.count_by_tracker_and_role
   end
 
   def edit
-    @role = Role.find_by_id(params[:role_id])
-    @tracker = Tracker.find_by_id(params[:tracker_id])
+    find_trackers_roles_and_statuses_for_edit
 
-    if request.post?
-      Workflow.destroy_all( ["role_id=? and tracker_id=?", @role.id, @tracker.id])
-      (params[:issue_status] || []).each { |status_id, transitions|
-        transitions.each { |new_status_id, options|
-          author = options.is_a?(Array) && options.include?('author') && !options.include?('always')
-          assignee = options.is_a?(Array) && options.include?('assignee') && !options.include?('always')
-          @role.workflows.build(:tracker_id => @tracker.id, :old_status_id => status_id, :new_status_id => new_status_id, :author => author, :assignee => assignee)
-        }
-      }
-      if @role.save
-        flash[:notice] = l(:notice_successful_update)
-        redirect_to :action => 'edit', :role_id => @role, :tracker_id => @tracker
-        return
+    if request.post? && @roles && @trackers && params[:transitions]
+      transitions = params[:transitions].deep_dup
+      transitions.each do |old_status_id, transitions_by_new_status|
+        transitions_by_new_status.each do |new_status_id, transition_by_rule|
+          transition_by_rule.reject! {|rule, transition| transition == 'no_change'}
+        end
       end
+      WorkflowTransition.replace_transitions(@trackers, @roles, transitions)
+      flash[:notice] = l(:notice_successful_update)
+      redirect_to_referer_or workflows_edit_path
+      return
     end
 
-    @used_statuses_only = (params[:used_statuses_only] == '0' ? false : true)
-    if @tracker && @used_statuses_only && @tracker.issue_statuses.any?
-      @statuses = @tracker.issue_statuses
-    end
-    @statuses ||= IssueStatus.find(:all, :order => 'position')
-
-    if @tracker && @role && @statuses.any?
-      workflows = Workflow.all(:conditions => {:role_id => @role.id, :tracker_id => @tracker.id})
+    if @trackers && @roles && @statuses.any?
+      workflows = WorkflowTransition.where(:role_id => @roles.map(&:id), :tracker_id => @trackers.map(&:id))
       @workflows = {}
       @workflows['always'] = workflows.select {|w| !w.author && !w.assignee}
       @workflows['author'] = workflows.select {|w| w.author}
@@ -61,7 +49,31 @@ class WorkflowsController < ApplicationController
     end
   end
 
+  def permissions
+    find_trackers_roles_and_statuses_for_edit
+
+    if request.post? && @roles && @trackers && params[:permissions]
+      permissions = params[:permissions].deep_dup
+      permissions.each { |field, rule_by_status_id|
+        rule_by_status_id.reject! {|status_id, rule| rule == 'no_change'}
+      }
+      WorkflowPermission.replace_permissions(@trackers, @roles, permissions)
+      flash[:notice] = l(:notice_successful_update)
+      redirect_to_referer_or workflows_permissions_path
+      return
+    end
+
+    if @roles && @trackers
+      @fields = (Tracker::CORE_FIELDS_ALL - @trackers.map(&:disabled_core_fields).reduce(:&)).map {|field| [field, l("field_"+field.sub(/_id$/, ''))]}
+      @custom_fields = @trackers.map(&:custom_fields).flatten.uniq.sort
+      @permissions = WorkflowPermission.rules_by_status_id(@trackers, @roles)
+      @statuses.each {|status| @permissions[status.id] ||= {}}
+    end
+  end
+
   def copy
+    @roles = Role.sorted
+    @trackers = Tracker.sorted
 
     if params[:source_tracker_id].blank? || params[:source_tracker_id] == 'any'
       @source_tracker = nil
@@ -73,30 +85,56 @@ class WorkflowsController < ApplicationController
     else
       @source_role = Role.find_by_id(params[:source_role_id].to_i)
     end
-
-    @target_trackers = params[:target_tracker_ids].blank? ? nil : Tracker.find_all_by_id(params[:target_tracker_ids])
-    @target_roles = params[:target_role_ids].blank? ? nil : Role.find_all_by_id(params[:target_role_ids])
-
+    @target_trackers = params[:target_tracker_ids].blank? ?
+        nil : Tracker.where(:id => params[:target_tracker_ids]).all
+    @target_roles = params[:target_role_ids].blank? ?
+        nil : Role.where(:id => params[:target_role_ids]).all
     if request.post?
       if params[:source_tracker_id].blank? || params[:source_role_id].blank? || (@source_tracker.nil? && @source_role.nil?)
         flash.now[:error] = l(:error_workflow_copy_source)
-      elsif @target_trackers.nil? || @target_roles.nil?
+      elsif @target_trackers.blank? || @target_roles.blank?
         flash.now[:error] = l(:error_workflow_copy_target)
       else
-        Workflow.copy(@source_tracker, @source_role, @target_trackers, @target_roles)
+        WorkflowRule.copy(@source_tracker, @source_role, @target_trackers, @target_roles)
         flash[:notice] = l(:notice_successful_update)
-        redirect_to :action => 'copy', :source_tracker_id => @source_tracker, :source_role_id => @source_role
+        redirect_to workflows_copy_path(:source_tracker_id => @source_tracker, :source_role_id => @source_role)
       end
     end
   end
 
   private
 
+  def find_trackers_roles_and_statuses_for_edit
+    find_roles
+    find_trackers
+    find_statuses
+  end
+
   def find_roles
-    @roles = Role.find(:all, :order => 'builtin, position')
+    ids = Array.wrap(params[:role_id])
+    if ids == ['all']
+      @roles = Role.sorted.all
+    elsif ids.present?
+      @roles = Role.where(:id => ids).all
+    end
+    @roles = nil if @roles.blank?
   end
 
   def find_trackers
-    @trackers = Tracker.find(:all, :order => 'position')
+    ids = Array.wrap(params[:tracker_id])
+    if ids == ['all']
+      @trackers = Tracker.sorted.all
+    elsif ids.present?
+      @trackers = Tracker.where(:id => ids).all
+    end
+    @trackers = nil if @trackers.blank?
+  end
+
+  def find_statuses
+    @used_statuses_only = (params[:used_statuses_only] == '0' ? false : true)
+    if @trackers && @used_statuses_only
+      @statuses = @trackers.map(&:issue_statuses).flatten.uniq.sort.presence
+    end
+    @statuses ||= IssueStatus.sorted.all
   end
 end

@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -33,11 +33,11 @@ class News < ActiveRecord::Base
   acts_as_watchable
 
   after_create :add_author_as_watcher
+  after_create :send_notification
 
-  scope :visible, lambda {|*args| {
-    :include => :project,
-    :conditions => Project.allowed_to_condition(args.shift || User.current, :view_news, *args)
-  }}
+  scope :visible, lambda {|*args|
+    includes(:project).where(Project.allowed_to_condition(args.shift || User.current, :view_news, *args))
+  }
 
   safe_attributes 'title', 'summary', 'description'
 
@@ -50,6 +50,22 @@ class News < ActiveRecord::Base
     user.allowed_to?(:comment_news, project)
   end
 
+  def recipients
+    project.users.select {|user| user.notify_about?(self) && user.allowed_to?(:view_news, project)}.map(&:mail)
+  end
+
+  # Returns the email addresses that should be cc'd when a new news is added
+  def cc_for_added_news
+    cc = []
+    if m = project.enabled_module('news')
+      cc = m.notified_watchers
+      unless project.is_public?
+        cc = cc.select {|user| project.users.include?(user)}
+      end
+    end
+    cc.map(&:mail)
+  end
+
   # returns latest news for projects visible by user
   def self.latest(user = User.current, count = 5)
     visible(user).includes([:author, :project]).order("#{News.table_name}.created_on DESC").limit(count).all
@@ -59,5 +75,11 @@ class News < ActiveRecord::Base
 
   def add_author_as_watcher
     Watcher.create(:watchable => self, :user => author)
+  end
+
+  def send_notification
+    if Setting.notified_events.include?('news_added')
+      Mailer.news_added(self).deliver
+    end
   end
 end

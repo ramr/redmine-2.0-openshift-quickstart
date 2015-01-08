@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,7 +17,7 @@
 
 require File.expand_path('../../../test_helper', __FILE__)
 
-class ApiTest::IssuesTest < ActionController::IntegrationTest
+class Redmine::ApiTest::IssuesTest < Redmine::ApiTest::Base
   fixtures :projects,
     :users,
     :roles,
@@ -25,6 +25,7 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
     :member_roles,
     :issues,
     :issue_statuses,
+    :issue_relations,
     :versions,
     :trackers,
     :projects_trackers,
@@ -113,7 +114,8 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
           :children => {:count => 1},
           :child => {
             :tag => 'relation',
-            :attributes => {:id => '2', :issue_id => '2', :issue_to_id => '3', :relation_type => 'relates'}
+            :attributes => {:id => '2', :issue_id => '2', :issue_to_id => '3',
+                            :relation_type => 'relates'}
           }
         assert_tag 'relations',
           :parent => {:tag => 'issue', :child => {:tag => 'id', :content => '1'}},
@@ -133,12 +135,12 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
 
     context "with custom field filter" do
       should "show only issues with the custom field value" do
-        get '/issues.xml', { :set_filter => 1, :f => ['cf_1'], :op => {:cf_1 => '='}, :v => {:cf_1 => ['MySQL']}}
-
-        expected_ids = Issue.visible.all(
-            :include => :custom_values,
-            :conditions => {:custom_values => {:custom_field_id => 1, :value => 'MySQL'}}).map(&:id)
-
+        get '/issues.xml',
+            {:set_filter => 1, :f => ['cf_1'], :op => {:cf_1 => '='},
+             :v => {:cf_1 => ['MySQL']}}
+        expected_ids = Issue.visible.
+            joins(:custom_values).
+            where(:custom_values => {:custom_field_id => 1, :value => 'MySQL'}).map(&:id)
         assert_select 'issues > issue > id', :count => expected_ids.count do |ids|
            ids.each { |id| assert expected_ids.delete(id.children.first.content.to_i) }
         end
@@ -149,15 +151,43 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
       should "show only issues with the custom field value" do
         get '/issues.xml', { :cf_1 => 'MySQL' }
 
-        expected_ids = Issue.visible.all(
-            :include => :custom_values,
-            :conditions => {:custom_values => {:custom_field_id => 1, :value => 'MySQL'}}).map(&:id)
+        expected_ids = Issue.visible.
+            joins(:custom_values).
+            where(:custom_values => {:custom_field_id => 1, :value => 'MySQL'}).map(&:id)
 
         assert_select 'issues > issue > id', :count => expected_ids.count do |ids|
           ids.each { |id| assert expected_ids.delete(id.children.first.content.to_i) }
         end
       end
     end
+  end
+
+  def test_index_should_include_issue_attributes
+    get '/issues.xml'
+    assert_select 'issues>issue>is_private', :text => 'false'
+  end
+
+  def test_index_should_allow_timestamp_filtering
+    Issue.delete_all
+    Issue.generate!(:subject => '1').update_column(:updated_on, Time.parse("2014-01-02T10:25:00Z"))
+    Issue.generate!(:subject => '2').update_column(:updated_on, Time.parse("2014-01-02T12:13:00Z"))
+
+    get '/issues.xml',
+      {:set_filter => 1, :f => ['updated_on'], :op => {:updated_on => '<='},
+       :v => {:updated_on => ['2014-01-02T12:00:00Z']}}
+    assert_select 'issues>issue', :count => 1
+    assert_select 'issues>issue>subject', :text => '1'
+
+    get '/issues.xml',
+      {:set_filter => 1, :f => ['updated_on'], :op => {:updated_on => '>='},
+       :v => {:updated_on => ['2014-01-02T12:00:00Z']}}
+    assert_select 'issues>issue', :count => 1
+    assert_select 'issues>issue>subject', :text => '2'
+
+    get '/issues.xml',
+      {:set_filter => 1, :f => ['updated_on'], :op => {:updated_on => '>='},
+       :v => {:updated_on => ['2014-01-02T08:00:00Z']}}
+    assert_select 'issues>issue', :count => 2
   end
 
   context "/index.json" do
@@ -168,7 +198,7 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
     should "show only issues with the status_id" do
       get '/issues.xml?status_id=5'
 
-      expected_ids = Issue.visible.all(:conditions => {:status_id => 5}).map(&:id)
+      expected_ids = Issue.visible.where(:status_id => 5).map(&:id)
 
       assert_select 'issues > issue > id', :count => expected_ids.count do |ids|
          ids.each { |id| assert expected_ids.delete(id.children.first.content.to_i) }
@@ -387,9 +417,21 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
 
     context "with subtasks" do
       setup do
-        @c1 = Issue.create!(:status_id => 1, :subject => "child c1", :tracker_id => 1, :project_id => 1, :author_id => 1, :parent_issue_id => 1)
-        @c2 = Issue.create!(:status_id => 1, :subject => "child c2", :tracker_id => 1, :project_id => 1, :author_id => 1, :parent_issue_id => 1)
-        @c3 = Issue.create!(:status_id => 1, :subject => "child c3", :tracker_id => 1, :project_id => 1, :author_id => 1, :parent_issue_id => @c1.id)
+        @c1 = Issue.create!(
+                :status_id => 1, :subject => "child c1",
+                :tracker_id => 1, :project_id => 1, :author_id => 1,
+                :parent_issue_id => 1
+              )
+        @c2 = Issue.create!(
+                :status_id => 1, :subject => "child c2",
+                :tracker_id => 1, :project_id => 1, :author_id => 1,
+                :parent_issue_id => 1
+              )
+        @c3 = Issue.create!(
+                :status_id => 1, :subject => "child c3",
+                :tracker_id => 1, :project_id => 1, :author_id => 1,
+                :parent_issue_id => @c1.id
+              )
       end
 
       context ".xml" do
@@ -427,7 +469,8 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
             assert_equal([
               {
                 'id' => @c1.id, 'subject' => 'child c1', 'tracker' => {'id' => 1, 'name' => 'Bug'},
-                'children' => [{ 'id' => @c3.id, 'subject' => 'child c3', 'tracker' => {'id' => 1, 'name' => 'Bug'} }]
+                'children' => [{'id' => @c3.id, 'subject' => 'child c3',
+                                'tracker' => {'id' => 1, 'name' => 'Bug'} }]
               },
               { 'id' => @c2.id, 'subject' => 'child c2', 'tracker' => {'id' => 1, 'name' => 'Bug'} }
               ],
@@ -438,18 +481,40 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
     end
   end
 
-  context "POST /issues.xml" do
-    should_allow_api_authentication(:post,
-                                    '/issues.xml',
-                                    {:issue => {:project_id => 1, :subject => 'API test', :tracker_id => 2, :status_id => 3}},
-                                    {:success_code => :created})
+  def test_show_should_include_issue_attributes
+    get '/issues/1.xml'
+    assert_select 'issue>is_private', :text => 'false'
+  end
 
+  test "GET /issues/:id.xml?include=watchers should include watchers" do
+    Watcher.create!(:user_id => 3, :watchable => Issue.find(1))
+
+    get '/issues/1.xml?include=watchers', {}, credentials('jsmith')
+
+    assert_response :ok
+    assert_equal 'application/xml', response.content_type
+    assert_select 'issue' do
+      assert_select 'watchers', Issue.find(1).watchers.count
+      assert_select 'watchers' do
+        assert_select 'user[id=3]'
+      end
+    end
+  end
+
+  context "POST /issues.xml" do
+    should_allow_api_authentication(
+      :post,
+      '/issues.xml',
+      {:issue => {:project_id => 1, :subject => 'API test', :tracker_id => 2, :status_id => 3}},
+      {:success_code => :created}
+    )
     should "create an issue with the attributes" do
       assert_difference('Issue.count') do
-        post '/issues.xml', {:issue => {:project_id => 1, :subject => 'API test', :tracker_id => 2, :status_id => 3}}, credentials('jsmith')
+        post '/issues.xml',
+             {:issue => {:project_id => 1, :subject => 'API test',
+              :tracker_id => 2, :status_id => 3}}, credentials('jsmith')
       end
-
-      issue = Issue.first(:order => 'id DESC')
+      issue = Issue.order('id DESC').first
       assert_equal 1, issue.project_id
       assert_equal 2, issue.tracker_id
       assert_equal 3, issue.status_id
@@ -459,6 +524,18 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
       assert_equal 'application/xml', @response.content_type
       assert_tag 'issue', :child => {:tag => 'id', :content => issue.id.to_s}
     end
+  end
+
+  test "POST /issues.xml with watcher_user_ids should create issue with watchers" do
+    assert_difference('Issue.count') do
+      post '/issues.xml',
+           {:issue => {:project_id => 1, :subject => 'Watchers',
+            :tracker_id => 2, :status_id => 3, :watcher_user_ids => [3, 1]}}, credentials('jsmith')
+      assert_response :created
+    end
+    issue = Issue.order('id desc').first
+    assert_equal 2, issue.watchers.size
+    assert_equal [1, 3], issue.watcher_user_ids.sort
   end
 
   context "POST /issues.xml with failure" do
@@ -474,15 +551,19 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
   context "POST /issues.json" do
     should_allow_api_authentication(:post,
                                     '/issues.json',
-                                    {:issue => {:project_id => 1, :subject => 'API test', :tracker_id => 2, :status_id => 3}},
+                                    {:issue => {:project_id => 1, :subject => 'API test',
+                                     :tracker_id => 2, :status_id => 3}},
                                     {:success_code => :created})
 
     should "create an issue with the attributes" do
       assert_difference('Issue.count') do
-        post '/issues.json', {:issue => {:project_id => 1, :subject => 'API test', :tracker_id => 2, :status_id => 3}}, credentials('jsmith')
+        post '/issues.json',
+             {:issue => {:project_id => 1, :subject => 'API test',
+                         :tracker_id => 2, :status_id => 3}},
+             credentials('jsmith')
       end
 
-      issue = Issue.first(:order => 'id DESC')
+      issue = Issue.order('id DESC').first
       assert_equal 1, issue.project_id
       assert_equal 2, issue.tracker_id
       assert_equal 3, issue.status_id
@@ -543,7 +624,10 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
 
   context "PUT /issues/3.xml with custom fields" do
     setup do
-      @parameters = {:issue => {:custom_fields => [{'id' => '1', 'value' => 'PostgreSQL' }, {'id' => '2', 'value' => '150'}]}}
+      @parameters = {
+        :issue => {:custom_fields => [{'id' => '1', 'value' => 'PostgreSQL' },
+        {'id' => '2', 'value' => '150'}]}
+      }
     end
 
     should "update custom fields" do
@@ -561,7 +645,10 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
     setup do
       field = CustomField.find(1)
       field.update_attribute :multiple, true
-      @parameters = {:issue => {:custom_fields => [{'id' => '1', 'value' => ['MySQL', 'PostgreSQL'] }, {'id' => '2', 'value' => '150'}]}}
+      @parameters = {
+        :issue => {:custom_fields => [{'id' => '1', 'value' => ['MySQL', 'PostgreSQL'] },
+        {'id' => '2', 'value' => '150'}]}
+      }
     end
 
     should "update custom fields" do
@@ -625,53 +712,32 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
                                     {:issue => {:subject => 'API update', :notes => 'A new note'}},
                                     {:success_code => :ok})
 
-    should "not create a new issue" do
-      assert_no_difference('Issue.count') do
-        put '/issues/6.json', @parameters, credentials('jsmith')
-      end
-    end
-
-    should "create a new journal" do
-      assert_difference('Journal.count') do
-        put '/issues/6.json', @parameters, credentials('jsmith')
-      end
-    end
-
-    should "add the note to the journal" do
-      put '/issues/6.json', @parameters, credentials('jsmith')
-
-      journal = Journal.last
-      assert_equal "A new note", journal.notes
-    end
-
     should "update the issue" do
-      put '/issues/6.json', @parameters, credentials('jsmith')
+      assert_no_difference('Issue.count') do
+        assert_difference('Journal.count') do
+          put '/issues/6.json', @parameters, credentials('jsmith')
+
+          assert_response :ok
+          assert_equal '', response.body
+        end
+      end
 
       issue = Issue.find(6)
       assert_equal "API update", issue.subject
+      journal = Journal.last
+      assert_equal "A new note", journal.notes
     end
-
   end
 
   context "PUT /issues/6.json with failed update" do
-    setup do
-      @parameters = {:issue => {:subject => ''}}
-    end
-
-    should "not create a new issue" do
+    should "return errors" do
       assert_no_difference('Issue.count') do
-        put '/issues/6.json', @parameters, credentials('jsmith')
-      end
-    end
+        assert_no_difference('Journal.count') do
+          put '/issues/6.json', {:issue => {:subject => ''}}, credentials('jsmith')
 
-    should "not create a new journal" do
-      assert_no_difference('Journal.count') do
-        put '/issues/6.json', @parameters, credentials('jsmith')
+          assert_response :unprocessable_entity
+        end
       end
-    end
-
-    should "have an errors attribute" do
-      put '/issues/6.json', @parameters, credentials('jsmith')
 
       json = ActiveSupport::JSON.decode(response.body)
       assert json['errors'].include?("Subject can't be blank")
@@ -685,8 +751,11 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
                                     {:success_code => :ok})
 
     should "delete the issue" do
-      assert_difference('Issue.count',-1) do
+      assert_difference('Issue.count', -1) do
         delete '/issues/6.xml', {}, credentials('jsmith')
+
+        assert_response :ok
+        assert_equal '', response.body
       end
 
       assert_nil Issue.find_by_id(6)
@@ -700,34 +769,63 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
                                     {:success_code => :ok})
 
     should "delete the issue" do
-      assert_difference('Issue.count',-1) do
+      assert_difference('Issue.count', -1) do
         delete '/issues/6.json', {}, credentials('jsmith')
+
+        assert_response :ok
+        assert_equal '', response.body
       end
 
       assert_nil Issue.find_by_id(6)
     end
   end
 
+  test "POST /issues/:id/watchers.xml should add watcher" do
+    assert_difference 'Watcher.count' do
+      post '/issues/1/watchers.xml', {:user_id => 3}, credentials('jsmith')
+
+      assert_response :ok
+      assert_equal '', response.body
+    end
+    watcher = Watcher.order('id desc').first
+    assert_equal Issue.find(1), watcher.watchable
+    assert_equal User.find(3), watcher.user
+  end
+
+  test "DELETE /issues/:id/watchers/:user_id.xml should remove watcher" do
+    Watcher.create!(:user_id => 3, :watchable => Issue.find(1))
+
+    assert_difference 'Watcher.count', -1 do
+      delete '/issues/1/watchers/3.xml', {}, credentials('jsmith')
+
+      assert_response :ok
+      assert_equal '', response.body
+    end
+    assert_equal false, Issue.find(1).watched_by?(User.find(3))
+  end
+
   def test_create_issue_with_uploaded_file
     set_tmp_attachments_directory
-
     # upload the file
     assert_difference 'Attachment.count' do
-      post '/uploads.xml', 'test_create_with_upload', {"CONTENT_TYPE" => 'application/octet-stream'}.merge(credentials('jsmith'))
+      post '/uploads.xml', 'test_create_with_upload',
+           {"CONTENT_TYPE" => 'application/octet-stream'}.merge(credentials('jsmith'))
       assert_response :created
     end
     xml = Hash.from_xml(response.body)
     token = xml['upload']['token']
-    attachment = Attachment.first(:order => 'id DESC')
+    attachment = Attachment.order('id DESC').first
 
     # create the issue with the upload's token
     assert_difference 'Issue.count' do
       post '/issues.xml',
-        {:issue => {:project_id => 1, :subject => 'Uploaded file', :uploads => [{:token => token, :filename => 'test.txt', :content_type => 'text/plain'}]}},
-        credentials('jsmith')
+           {:issue => {:project_id => 1, :subject => 'Uploaded file',
+                       :uploads => [{:token => token, :filename => 'test.txt',
+                                     :content_type => 'text/plain'}]}},
+           credentials('jsmith')
       assert_response :created
     end
-    issue = Issue.first(:order => 'id DESC')
+    issue = Issue.order('id DESC').first
     assert_equal 1, issue.attachments.count
     assert_equal attachment, issue.attachments.first
 
@@ -754,22 +852,25 @@ class ApiTest::IssuesTest < ActionController::IntegrationTest
 
   def test_update_issue_with_uploaded_file
     set_tmp_attachments_directory
-
     # upload the file
     assert_difference 'Attachment.count' do
-      post '/uploads.xml', 'test_upload_with_upload', {"CONTENT_TYPE" => 'application/octet-stream'}.merge(credentials('jsmith'))
+      post '/uploads.xml', 'test_upload_with_upload',
+           {"CONTENT_TYPE" => 'application/octet-stream'}.merge(credentials('jsmith'))
       assert_response :created
     end
     xml = Hash.from_xml(response.body)
     token = xml['upload']['token']
-    attachment = Attachment.first(:order => 'id DESC')
+    attachment = Attachment.order('id DESC').first
 
     # update the issue with the upload's token
     assert_difference 'Journal.count' do
       put '/issues/1.xml',
-        {:issue => {:notes => 'Attachment added', :uploads => [{:token => token, :filename => 'test.txt', :content_type => 'text/plain'}]}},
-        credentials('jsmith')
+          {:issue => {:notes => 'Attachment added',
+                      :uploads => [{:token => token, :filename => 'test.txt',
+                                    :content_type => 'text/plain'}]}},
+          credentials('jsmith')
       assert_response :ok
+      assert_equal '', @response.body
     end
 
     issue = Issue.find(1)

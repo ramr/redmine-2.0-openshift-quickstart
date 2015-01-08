@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -27,7 +27,6 @@ class Member < ActiveRecord::Base
   validate :validate_role
 
   before_destroy :set_issue_category_nil
-  after_destroy :unwatch_from_permission_change
 
   def role
   end
@@ -52,7 +51,6 @@ class Member < ActiveRecord::Base
     member_roles_to_destroy = member_roles.select {|mr| !ids.include?(mr.role_id)}
     if member_roles_to_destroy.any?
       member_roles_to_destroy.each(&:destroy)
-      unwatch_from_permission_change
     end
   end
 
@@ -75,6 +73,18 @@ class Member < ActiveRecord::Base
     member_roles.detect {|mr| mr.inherited_from}.nil?
   end
 
+  def destroy
+    if member_roles.reload.present?
+      # destroying the last role will destroy another instance
+      # of the same Member record, #super would then trigger callbacks twice
+      member_roles.destroy_all
+      @destroyed = true
+      freeze
+    else
+      super
+    end
+  end
+
   def include?(user)
     if principal.is_a?(Group)
       !user.nil? && user.groups.include?(principal)
@@ -84,31 +94,33 @@ class Member < ActiveRecord::Base
   end
 
   def set_issue_category_nil
-    if user
+    if user_id && project_id
       # remove category based auto assignments for this member
-      IssueCategory.update_all "assigned_to_id = NULL", ["project_id = ? AND assigned_to_id = ?", project.id, user.id]
+      IssueCategory.where(["project_id = ? AND assigned_to_id = ?", project_id, user_id]).
+        update_all("assigned_to_id = NULL")
     end
   end
 
-  # Find or initilize a Member with an id, attributes, and for a Principal
+  # Find or initialize a Member with an id, attributes, and for a Principal
   def self.edit_membership(id, new_attributes, principal=nil)
     @membership = id.present? ? Member.find(id) : Member.new(:principal => principal)
     @membership.attributes = new_attributes
     @membership
   end
 
+  # Finds or initilizes a Member for the given project and principal
+  def self.find_or_new(project, principal)
+    project_id = project.is_a?(Project) ? project.id : project
+    principal_id = principal.is_a?(Principal) ? principal.id : principal
+
+    member = Member.find_by_project_id_and_user_id(project_id, principal_id)
+    member ||= Member.new(:project_id => project_id, :user_id => principal_id)
+    member
+  end
+
   protected
 
   def validate_role
     errors.add_on_empty :role if member_roles.empty? && roles.empty?
-  end
-
-  private
-
-  # Unwatch things that the user is no longer allowed to view inside project
-  def unwatch_from_permission_change
-    if user
-      Watcher.prune(:user => user, :project => project)
-    end
   end
 end

@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,6 +20,11 @@ namespace :redmine do
     desc 'Removes uploaded files left unattached after one day.'
     task :prune => :environment do
       Attachment.prune
+    end
+
+    desc 'Moves attachments stored at the root of the file directory (ie. created before Redmine 2.3) to their subdirectories'
+    task :move_to_subdirectories => :environment do
+      Attachment.move_from_root_to_target_directory
     end
   end
 
@@ -48,6 +53,59 @@ namespace :redmine do
     Rake::Task["redmine:plugins:assets"].invoke
   end
 
+desc <<-DESC
+FOR EXPERIMENTAL USE ONLY, Moves Redmine data from production database to the development database.
+This task should only be used when you need to move data from one DBMS to a different one (eg. MySQL to PostgreSQL).
+WARNING: All data in the development database is deleted.
+DESC
+
+  task :migrate_dbms => :environment do
+    ActiveRecord::Base.establish_connection :development
+    target_tables = ActiveRecord::Base.connection.tables
+    ActiveRecord::Base.remove_connection
+
+    ActiveRecord::Base.establish_connection :production
+    tables = ActiveRecord::Base.connection.tables.sort - %w(schema_migrations plugin_schema_info)
+
+    if (tables - target_tables).any?
+      list = (tables - target_tables).map {|table| "* #{table}"}.join("\n")
+      abort "The following table(s) are missing from the target database:\n#{list}"
+    end
+
+    tables.each do |table_name|
+      Source = Class.new(ActiveRecord::Base)
+      Target = Class.new(ActiveRecord::Base)
+      Target.establish_connection(:development)
+
+      [Source, Target].each do |klass|
+        klass.table_name = table_name
+        klass.reset_column_information
+        klass.inheritance_column = "foo"
+        klass.record_timestamps = false
+      end
+      Target.primary_key = (Target.column_names.include?("id") ? "id" : nil)
+
+      source_count = Source.count
+      puts "Migrating %6d records from #{table_name}..." % source_count
+
+      Target.delete_all
+      offset = 0
+      while (objects = Source.offset(offset).limit(5000).order("1,2").to_a) && objects.any?
+        offset += objects.size
+        Target.transaction do
+          objects.each do |object|
+            new_object = Target.new(object.attributes)
+            new_object.id = object.id if Target.primary_key
+            new_object.save(:validate => false)
+          end
+        end
+      end
+      Target.connection.reset_pk_sequence!(table_name) if Target.primary_key
+      target_count = Target.count
+      abort "Some records were not migrated" unless source_count == target_count
+    end
+  end
+
   namespace :plugins do
     desc 'Migrates installed plugins.'
     task :migrate => :environment do
@@ -70,6 +128,8 @@ namespace :redmine do
       rescue Redmine::PluginNotFound
         abort "Plugin #{name} was not found."
       end
+
+      Rake::Task["db:schema:dump"].invoke
     end
 
     desc 'Copies plugins assets into the public directory.'
@@ -80,6 +140,36 @@ namespace :redmine do
         Redmine::Plugin.mirror_assets(name)
       rescue Redmine::PluginNotFound
         abort "Plugin #{name} was not found."
+      end
+    end
+
+    desc 'Runs the plugins tests.'
+    task :test do
+      Rake::Task["redmine:plugins:test:units"].invoke
+      Rake::Task["redmine:plugins:test:functionals"].invoke
+      Rake::Task["redmine:plugins:test:integration"].invoke
+    end
+
+    namespace :test do
+      desc 'Runs the plugins unit tests.'
+      Rake::TestTask.new :units => "db:test:prepare" do |t|
+        t.libs << "test"
+        t.verbose = true
+        t.pattern = "plugins/#{ENV['NAME'] || '*'}/test/unit/**/*_test.rb"
+      end
+
+      desc 'Runs the plugins functional tests.'
+      Rake::TestTask.new :functionals => "db:test:prepare" do |t|
+        t.libs << "test"
+        t.verbose = true
+        t.pattern = "plugins/#{ENV['NAME'] || '*'}/test/functional/**/*_test.rb"
+      end
+
+      desc 'Runs the plugins integration tests.'
+      Rake::TestTask.new :integration => "db:test:prepare" do |t|
+        t.libs << "test"
+        t.verbose = true
+        t.pattern = "plugins/#{ENV['NAME'] || '*'}/test/integration/**/*_test.rb"
       end
     end
   end

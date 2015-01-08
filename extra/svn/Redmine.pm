@@ -102,6 +102,83 @@ S<them :>
 
 And you need to upgrade at least reposman.rb (after r860).
 
+=head1 GIT SMART HTTP SUPPORT
+
+Git's smart HTTP protocol (available since Git 1.7.0) will not work with the
+above settings. Redmine.pm normally does access control depending on the HTTP
+method used: read-only methods are OK for everyone in public projects and
+members with read rights in private projects. The rest require membership with
+commit rights in the project.
+
+However, this scheme doesn't work for Git's smart HTTP protocol, as it will use
+POST even for a simple clone. Instead, read-only requests must be detected using
+the full URL (including the query string): anything that doesn't belong to the
+git-receive-pack service is read-only.
+
+To activate this mode of operation, add this line inside your <Location /git>
+block:
+
+  RedmineGitSmartHttp yes
+
+Here's a sample Apache configuration which integrates git-http-backend with
+a MySQL database and this new option:
+
+   SetEnv GIT_PROJECT_ROOT /var/www/git/
+   SetEnv GIT_HTTP_EXPORT_ALL
+   ScriptAlias /git/ /usr/libexec/git-core/git-http-backend/
+   <Location /git>
+       Order allow,deny
+       Allow from all
+
+       AuthType Basic
+       AuthName Git
+       Require valid-user
+
+       PerlAccessHandler Apache::Authn::Redmine::access_handler
+       PerlAuthenHandler Apache::Authn::Redmine::authen_handler
+       # for mysql
+       RedmineDSN "DBI:mysql:database=redmine;host=127.0.0.1"
+       RedmineDbUser "redmine"
+       RedmineDbPass "xxx"
+       RedmineGitSmartHttp yes
+    </Location>
+
+Make sure that all the names of the repositories under /var/www/git/ have a
+matching identifier for some project: /var/www/git/myproject and
+/var/www/git/myproject.git will work. You can put both bare and non-bare
+repositories in /var/www/git, though bare repositories are strongly
+recommended. You should create them with the rights of the user running Redmine,
+like this:
+
+  cd /var/www/git
+  sudo -u user-running-redmine mkdir myproject
+  cd myproject
+  sudo -u user-running-redmine git init --bare
+
+Once you have activated this option, you have three options when cloning a
+repository:
+
+- Cloning using "http://user@host/git/repo(.git)" works, but will ask for the password
+  all the time.
+
+- Cloning with "http://user:pass@host/git/repo(.git)" does not have this problem, but
+  this could reveal accidentally your password to the console in some versions
+  of Git, and you would have to ensure that .git/config is not readable except
+  by the owner for each of your projects.
+
+- Use "http://host/git/repo(.git)", and store your credentials in the ~/.netrc
+  file. This is the recommended solution, as you only have one file to protect
+  and passwords will not be leaked accidentally to the console.
+
+  IMPORTANT NOTE: It is *very important* that the file cannot be read by other
+  users, as it will contain your password in cleartext. To create the file, you
+  can use the following commands, replacing yourhost, youruser and yourpassword
+  with the right values:
+
+    touch ~/.netrc
+    chmod 600 ~/.netrc
+    echo -e "machine yourhost\nlogin youruser\npassword yourpassword" > ~/.netrc
+
 =cut
 
 use strict;
@@ -151,13 +228,18 @@ my @directives = (
     args_how => TAKE1,
     errmsg => 'RedmineCacheCredsMax must be decimal number',
   },
+  {
+    name => 'RedmineGitSmartHttp',
+    req_override => OR_AUTHCFG,
+    args_how => TAKE1,
+  },
 );
 
 sub RedmineDSN {
   my ($self, $parms, $arg) = @_;
   $self->{RedmineDSN} = $arg;
   my $query = "SELECT 
-                 hashed_password, salt, auth_source_id, permissions
+                 users.hashed_password, users.salt, users.auth_source_id, roles.permissions, projects.status
               FROM projects, users, roles
               WHERE 
                 users.login=? 
@@ -166,8 +248,14 @@ sub RedmineDSN {
                 AND (
                   roles.id IN (SELECT member_roles.role_id FROM members, member_roles WHERE members.user_id = users.id AND members.project_id = projects.id AND members.id = member_roles.member_id)
                   OR
-                  (roles.builtin=1 AND cast(projects.is_public as CHAR) IN ('t', '1'))
-                ) ";
+                  (cast(projects.is_public as CHAR) IN ('t', '1')
+                    AND (roles.builtin=1
+                         OR roles.id IN (SELECT member_roles.role_id FROM members, member_roles, users g
+                                 WHERE members.user_id = g.id AND members.project_id = projects.id AND members.id = member_roles.member_id
+                                 AND g.type = 'GroupNonMember'))
+                  )
+                )
+                AND roles.permissions IS NOT NULL";
   $self->{RedmineQuery} = trim($query);
 }
 
@@ -188,6 +276,17 @@ sub RedmineCacheCredsMax {
   }
 }
 
+sub RedmineGitSmartHttp {
+  my ($self, $parms, $arg) = @_;
+  $arg = lc $arg;
+
+  if ($arg eq "yes" || $arg eq "true") {
+    $self->{RedmineGitSmartHttp} = 1;
+  } else {
+    $self->{RedmineGitSmartHttp} = 0;
+  }
+}
+
 sub trim {
   my $string = shift;
   $string =~ s/\s{2,}/ /g;
@@ -202,7 +301,24 @@ sub set_val {
 Apache2::Module::add(__PACKAGE__, \@directives);
 
 
-my %read_only_methods = map { $_ => 1 } qw/GET PROPFIND REPORT OPTIONS/;
+my %read_only_methods = map { $_ => 1 } qw/GET HEAD PROPFIND REPORT OPTIONS/;
+
+sub request_is_read_only {
+  my ($r) = @_;
+  my $cfg = Apache2::Module::get_config(__PACKAGE__, $r->server, $r->per_dir_config);
+
+  # Do we use Git's smart HTTP protocol, or not?
+  if (defined $cfg->{RedmineGitSmartHttp} and $cfg->{RedmineGitSmartHttp}) {
+    my $uri = $r->unparsed_uri;
+    my $location = $r->location;
+    my $is_read_only = $uri !~ m{^$location/*[^/]+/+(info/refs\?service=)?git\-receive\-pack$}o;
+    return $is_read_only;
+  } else {
+    # Standard behaviour: check the HTTP method
+    my $method = $r->method;
+    return defined $read_only_methods{$method};
+  }
+}
 
 sub access_handler {
   my $r = shift;
@@ -212,13 +328,12 @@ sub access_handler {
       return FORBIDDEN;
   }
 
-  my $method = $r->method;
-  return OK unless defined $read_only_methods{$method};
+  return OK unless request_is_read_only($r);
 
   my $project_id = get_project_identifier($r);
 
   $r->set_handlers(PerlAuthenHandler => [\&OK])
-      if is_public_project($project_id, $r) && anonymous_role_allows_browse_repository($r);
+      if is_public_project($project_id, $r) && anonymous_allowed_to_browse_repository($project_id, $r);
 
   return OK
 }
@@ -233,7 +348,7 @@ sub authen_handler {
       return OK;
   } else {
       $r->note_auth_failure();
-      return AUTH_REQUIRED;
+      return DECLINED;
   }
 }
 
@@ -272,15 +387,15 @@ sub is_public_project {
 
     my $dbh = connect_database($r);
     my $sth = $dbh->prepare(
-        "SELECT is_public FROM projects WHERE projects.identifier = ?;"
+        "SELECT is_public FROM projects WHERE projects.identifier = ? AND projects.status <> 9;"
     );
 
     $sth->execute($project_id);
     my $ret = 0;
     if (my @row = $sth->fetchrow_array) {
-    	if ($row[0] eq "1" || $row[0] eq "t") {
-    		$ret = 1;
-    	}
+      if ($row[0] eq "1" || $row[0] eq "t") {
+        $ret = 1;
+      }
     }
     $sth->finish();
     undef $sth;
@@ -290,15 +405,20 @@ sub is_public_project {
     $ret;
 }
 
-sub anonymous_role_allows_browse_repository {
+sub anonymous_allowed_to_browse_repository {
+  my $project_id = shift;
   my $r = shift;
 
   my $dbh = connect_database($r);
   my $sth = $dbh->prepare(
-      "SELECT permissions FROM roles WHERE builtin = 2;"
+      "SELECT permissions FROM roles WHERE permissions like '%browse_repository%'
+        AND (roles.builtin = 2
+             OR roles.id IN (SELECT member_roles.role_id FROM projects, members, member_roles, users
+                             WHERE members.user_id = users.id AND members.project_id = projects.id AND members.id = member_roles.member_id
+                             AND projects.identifier = ? AND users.type = 'GroupAnonymous'));"
   );
 
-  $sth->execute();
+  $sth->execute($project_id);
   my $ret = 0;
   if (my @row = $sth->fetchrow_array) {
     if ($row[0] =~ /:browse_repository/) {
@@ -338,7 +458,7 @@ sub is_member {
 
   my $pass_digest = Digest::SHA::sha1_hex($redmine_pass);
 
-  my $access_mode = defined $read_only_methods{$r->method} ? "R" : "W";
+  my $access_mode = request_is_read_only($r) ? "R" : "W";
 
   my $cfg = Apache2::Module::get_config(__PACKAGE__, $r->server, $r->per_dir_config);
   my $usrprojpass;
@@ -351,12 +471,15 @@ sub is_member {
   $sth->execute($redmine_user, $project_id);
 
   my $ret;
-  while (my ($hashed_password, $salt, $auth_source_id, $permissions) = $sth->fetchrow_array) {
+  while (my ($hashed_password, $salt, $auth_source_id, $permissions, $project_status) = $sth->fetchrow_array) {
+      if ($project_status eq "9" || ($project_status ne "1" && $access_mode eq "W")) {
+        last;
+      }
 
       unless ($auth_source_id) {
-	  			my $method = $r->method;
+          my $method = $r->method;
           my $salted_password = Digest::SHA::sha1_hex($salt.$pass_digest);
-					if ($hashed_password eq $salted_password && (($access_mode eq "R" && $permissions =~ /:browse_repository/) || $permissions =~ /:commit_access/) ) {
+          if ($hashed_password eq $salted_password && (($access_mode eq "R" && $permissions =~ /:browse_repository/) || $permissions =~ /:commit_access/) ) {
               $ret = 1;
               last;
           }
@@ -414,7 +537,9 @@ sub is_member {
 sub get_project_identifier {
     my $r = shift;
 
+    my $cfg = Apache2::Module::get_config(__PACKAGE__, $r->server, $r->per_dir_config);
     my $location = $r->location;
+    $location =~ s/\.git$// if (defined $cfg->{RedmineGitSmartHttp} and $cfg->{RedmineGitSmartHttp});
     my ($identifier) = $r->uri =~ m{$location/*([^/.]+)};
     $identifier;
 }

@@ -80,13 +80,18 @@ module SortHelper
       @criteria.collect {|k,o| k + (o ? '' : ':desc')}.join(',')
     end
 
+    # Returns an array of SQL fragments used to sort the list
     def to_sql
       sql = @criteria.collect do |k,o|
         if s = @available_criteria[k]
-          (o ? s.to_a : s.to_a.collect {|c| append_desc(c)}).join(', ')
+          (o ? s.to_a : s.to_a.collect {|c| append_desc(c)})
         end
-      end.compact.join(', ')
+      end.flatten.compact
       sql.blank? ? nil : sql
+    end
+
+    def to_a
+      @criteria.dup
     end
 
     def add!(key, asc)
@@ -182,6 +187,10 @@ module SortHelper
     @sort_criteria.to_sql
   end
 
+  def sort_criteria
+    @sort_criteria
+  end
+
   # Returns a link which sorts by the named column.
   #
   # - column is the name of an attribute in the sorted record collection.
@@ -229,6 +238,18 @@ module SortHelper
     default_order = options.delete(:default_order) || 'asc'
     options[:title] = l(:label_sort_by, "\"#{caption}\"") unless options[:title]
     content_tag('th', sort_link(column, caption, default_order), options)
+  end
+
+  # Returns the css classes for the current sort order
+  #
+  # Example:
+  #
+  #   sort_css_classes
+  #   # => "sort-by-created-on sort-desc"
+  def sort_css_classes
+    if @sort_criteria.first_key
+      "sort-by-#{@sort_criteria.first_key.to_s.dasherize} sort-#{@sort_criteria.first_asc? ? 'asc' : 'desc'}"
+    end
   end
 end
 

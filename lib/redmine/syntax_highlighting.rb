@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,7 +20,6 @@ module Redmine
 
     class << self
       attr_reader :highlighter
-      delegate :highlight_by_filename, :highlight_by_language, :to => :highlighter
 
       def highlighter=(name)
         if name.is_a?(Module)
@@ -29,11 +28,22 @@ module Redmine
           @highlighter = const_get(name)
         end
       end
+
+      def highlight_by_filename(text, filename)
+        highlighter.highlight_by_filename(text, filename)
+      rescue
+        ERB::Util.h(text)
+      end
+
+      def highlight_by_language(text, language)
+        highlighter.highlight_by_language(text, language)
+      rescue
+        ERB::Util.h(text)
+      end
     end
 
     module CodeRay
       require 'coderay'
-      require 'coderay/helpers/file_type'
 
       class << self
         # Highlights +text+ as the content of +filename+
@@ -46,7 +56,7 @@ module Redmine
         # Highlights +text+ using +language+ syntax
         # Should not return outer pre tag
         def highlight_by_language(text, language)
-          ::CodeRay.scan(text, language).html(:line_numbers => :inline, :line_number_anchors => false, :wrap => :span)
+          ::CodeRay.scan(text, language).html(:wrap => :span)
         end
       end
     end

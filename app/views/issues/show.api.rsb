@@ -15,13 +15,15 @@ api.issue do
   api.start_date @issue.start_date
   api.due_date @issue.due_date
   api.done_ratio @issue.done_ratio
+  api.is_private @issue.is_private
   api.estimated_hours @issue.estimated_hours
   api.spent_hours(@issue.spent_hours) if User.current.allowed_to?(:view_time_entries, @project)
 
-  render_api_custom_values @issue.custom_field_values, api
+  render_api_custom_values @issue.visible_custom_field_values, api
 
   api.created_on @issue.created_on
   api.updated_on @issue.updated_on
+  api.closed_on @issue.closed_on
 
   render_api_issue_children(@issue, api) if include_in_api_response?('children')
 
@@ -48,13 +50,13 @@ api.issue do
   end if include_in_api_response?('changesets') && User.current.allowed_to?(:view_changesets, @project)
 
   api.array :journals do
-    @issue.journals.each do |journal|
+    @journals.each do |journal|
       api.journal :id => journal.id do
         api.user(:id => journal.user_id, :name => journal.user.name) unless journal.user.nil?
         api.notes journal.notes
         api.created_on journal.created_on
         api.array :details do
-          journal.details.each do |detail|
+          journal.visible_details.each do |detail|
             api.detail :property => detail.property, :name => detail.prop_key do
               api.old_value detail.old_value
               api.new_value detail.value
@@ -64,4 +66,10 @@ api.issue do
       end
     end
   end if include_in_api_response?('journals')
+
+  api.array :watchers do
+    @issue.watcher_users.each do |user|
+      api.user :id => user.id, :name => user.name
+    end
+  end if include_in_api_response?('watchers') && User.current.allowed_to?(:view_issue_watchers, @issue.project)
 end

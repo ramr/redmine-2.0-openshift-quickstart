@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,15 +19,15 @@ class ContextMenusController < ApplicationController
   helper :watchers
   helper :issues
 
+  before_filter :find_issues, :only => :issues
+
   def issues
-    @issues = Issue.visible.all(:conditions => {:id => params[:ids]}, :include => :project)
     if (@issues.size == 1)
       @issue = @issues.first
     end
+    @issue_ids = @issues.map(&:id).sort
 
     @allowed_statuses = @issues.map(&:new_statuses_allowed_to).reduce(:&)
-    @projects = @issues.collect(&:project).compact.uniq
-    @project = @projects.first if @projects.size == 1
 
     @can = {:edit => User.current.allowed_to?(:edit_issues, @projects),
             :log_time => (@project && User.current.allowed_to?(:log_time, @project)),
@@ -48,29 +48,33 @@ class ContextMenusController < ApplicationController
       @assignables = @projects.map(&:assignable_users).reduce(:&)
       @trackers = @projects.map(&:trackers).reduce(:&)
     end
+    @versions = @projects.map {|p| p.shared_versions.open}.reduce(:&)
 
     @priorities = IssuePriority.active.reverse
     @back = back_url
 
     @options_by_custom_field = {}
     if @can[:edit]
-      custom_fields = @issues.map(&:available_custom_fields).reduce(:&).select do |f|
-        %w(bool list user version).include?(f.field_format) && !f.multiple?
-      end
+      custom_fields = @issues.map(&:editable_custom_fields).reduce(:&).reject(&:multiple?)
       custom_fields.each do |field|
         values = field.possible_values_options(@projects)
-        if values.any?
+        if values.present?
           @options_by_custom_field[field] = values
         end
       end
     end
 
+    @safe_attributes = @issues.map(&:safe_attribute_names).reduce(:&)
     render :layout => false
   end
 
   def time_entries
-    @time_entries = TimeEntry.all(
-       :conditions => {:id => params[:ids]}, :include => :project)
+    @time_entries = TimeEntry.where(:id => params[:ids]).preload(:project).to_a
+    (render_404; return) unless @time_entries.present?
+    if (@time_entries.size == 1)
+      @time_entry = @time_entries.first
+    end
+
     @projects = @time_entries.collect(&:project).compact.uniq
     @project = @projects.first if @projects.size == 1
     @activities = TimeEntryActivity.shared.active
@@ -78,6 +82,18 @@ class ContextMenusController < ApplicationController
             :delete => User.current.allowed_to?(:edit_time_entries, @projects)
             }
     @back = back_url
+
+    @options_by_custom_field = {}
+    if @can[:edit]
+      custom_fields = @time_entries.map(&:editable_custom_fields).reduce(:&).reject(&:multiple?)
+      custom_fields.each do |field|
+        values = field.possible_values_options(@projects)
+        if values.present?
+          @options_by_custom_field[field] = values
+        end
+      end
+    end
+
     render :layout => false
   end
 end

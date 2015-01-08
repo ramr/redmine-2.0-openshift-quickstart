@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -59,7 +59,7 @@ class Repository::Mercurial < Repository
 
   # Returns the readable identifier for the given mercurial changeset
   def self.format_changeset_identifier(changeset)
-    "#{changeset.revision}:#{changeset.scmid}"
+    "#{changeset.revision}:#{changeset.scmid[0, 12]}"
   end
 
   # Returns the identifier for the given Mercurial changeset
@@ -71,17 +71,39 @@ class Repository::Mercurial < Repository
     super(cs, cs_to, ' ')
   end
 
+  def modify_entry_lastrev_identifier(entry)
+    if entry.lastrev && entry.lastrev.identifier
+      entry.lastrev.identifier = scmid_for_inserting_db(entry.lastrev.identifier)
+    end
+  end
+  private :modify_entry_lastrev_identifier
+
+  def entry(path=nil, identifier=nil)
+    entry = scm.entry(path, identifier)
+    return nil if entry.nil?
+    modify_entry_lastrev_identifier(entry)
+    entry
+  end
+
+  def scm_entries(path=nil, identifier=nil)
+    entries = scm.entries(path, identifier)
+    return nil if entries.nil?
+    entries.each {|entry| modify_entry_lastrev_identifier(entry)}
+    entries
+  end
+  protected :scm_entries
+
   # Finds and returns a revision with a number or the beginning of a hash
   def find_changeset_by_name(name)
     return nil if name.blank?
     s = name.to_s
     if /[^\d]/ =~ s or s.size > 8
-      e = changesets.find(:first, :conditions => ['scmid = ?', s])
+      cs = changesets.where(:scmid => s).first
     else
-      e = changesets.find(:first, :conditions => ['revision = ?', s])
+      cs = changesets.where(:revision => s).first
     end
-    return e if e
-    changesets.find(:first, :conditions => ['scmid LIKE ?', "#{s}%"])  # last ditch
+    return cs if cs
+    changesets.where('scmid LIKE ?', "#{s}%").first
   end
 
   # Returns the latest changesets for +path+; sorted by revision number
@@ -92,11 +114,34 @@ class Repository::Mercurial < Repository
   # Sqlite3 and PostgreSQL pass.
   # Is this MySQL bug?
   def latest_changesets(path, rev, limit=10)
-    changesets.find(:all,
-                    :include    => :user,
-                    :conditions => latest_changesets_cond(path, rev, limit),
-                    :limit      => limit,
-                    :order      => "#{Changeset.table_name}.id DESC")
+    changesets.
+      includes(:user).
+      where(latest_changesets_cond(path, rev, limit)).
+      limit(limit).
+      order("#{Changeset.table_name}.id DESC").
+      all
+  end
+
+  def is_short_id_in_db?
+    return @is_short_id_in_db unless @is_short_id_in_db.nil?
+    cs = changesets.first
+    @is_short_id_in_db = (!cs.nil? && cs.scmid.length != 40)
+  end
+  private :is_short_id_in_db?
+
+  def scmid_for_inserting_db(scmid)
+    is_short_id_in_db? ? scmid[0, 12] : scmid
+  end
+
+  def nodes_in_branch(rev, branch_limit)
+    scm.nodes_in_branch(rev, :limit => branch_limit).collect do |b|
+      scmid_for_inserting_db(b)
+    end
+  end
+
+  def tag_scmid(rev)
+    scmid = scm.tagmap[rev]
+    scmid.nil? ? nil : scmid_for_inserting_db(scmid)
   end
 
   def latest_changesets_cond(path, rev, limit)
@@ -110,11 +155,11 @@ class Repository::Mercurial < Repository
       # Revisions in root directory and sub directory are not equal.
       # So, in order to get correct limit, we need to get all revisions.
       # But, it is very heavy.
-      # Mercurial does not treat direcotry.
+      # Mercurial does not treat directory.
       # So, "hg log DIR" is very heavy.
       branch_limit = path.blank? ? limit : ( limit * 5 )
-      args << scm.nodes_in_branch(rev, :limit => branch_limit)
-    elsif last = rev ? find_changeset_by_name(scm.tagmap[rev] || rev) : nil
+      args << nodes_in_branch(rev, branch_limit)
+    elsif last = rev ? find_changeset_by_name(tag_scmid(rev) || rev) : nil
       cond << "#{Changeset.table_name}.id <= ?"
       args << last.id
     end
@@ -140,16 +185,23 @@ class Repository::Mercurial < Repository
     (db_rev + 1).step(scm_rev, FETCH_AT_ONCE) do |i|
       scm.each_revision('', i, [i + FETCH_AT_ONCE - 1, scm_rev].min) do |re|
         transaction do
-          parents = (re.parents || []).collect{|rp| find_changeset_by_name(rp)}.compact
+          parents = (re.parents || []).collect do |rp|
+            find_changeset_by_name(scmid_for_inserting_db(rp))
+          end.compact
           cs = Changeset.create(:repository   => self,
                                 :revision     => re.revision,
-                                :scmid        => re.scmid,
+                                :scmid        => scmid_for_inserting_db(re.scmid),
                                 :committer    => re.author,
                                 :committed_on => re.time,
                                 :comments     => re.message,
                                 :parents      => parents)
           unless cs.new_record?
-            re.paths.each { |e| cs.create_change(e) }
+            re.paths.each do |e|
+              if from_revision = e[:from_revision]
+                e[:from_revision] = scmid_for_inserting_db(from_revision)
+              end
+              cs.create_change(e)
+            end
           end
         end
       end

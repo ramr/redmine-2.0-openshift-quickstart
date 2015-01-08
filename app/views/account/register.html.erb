@@ -1,6 +1,6 @@
 <h2><%=l(:label_register)%> <%=link_to l(:label_login_with_open_id_option), signin_url if Setting.openid? %></h2>
 
-<%= labelled_form_for @user, :url => {:action => 'register'} do |f| %>
+<%= labelled_form_for @user, :url => register_path do |f| %>
 <%= error_messages_for 'user' %>
 
 <div class="box tabular">
@@ -16,7 +16,10 @@
 <p><%= f.text_field :firstname, :required => true %></p>
 <p><%= f.text_field :lastname, :required => true %></p>
 <p><%= f.text_field :mail, :required => true %></p>
+
+<% unless @user.force_default_language? %>
 <p><%= f.select :language, lang_options_for_select %></p>
+<% end %>
 
 <% if Setting.openid? %>
   <p><%= f.text_field :identity_url  %></p>

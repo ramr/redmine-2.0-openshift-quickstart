@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -24,12 +24,13 @@ class TimeEntry < ActiveRecord::Base
   belongs_to :user
   belongs_to :activity, :class_name => 'TimeEntryActivity', :foreign_key => 'activity_id'
 
-  attr_protected :project_id, :user_id, :tyear, :tmonth, :tweek
+  attr_protected :user_id, :tyear, :tmonth, :tweek
 
   acts_as_customizable
   acts_as_event :title => Proc.new {|o| "#{l_hours(o.hours)} (#{(o.issue || o.project).event_title})"},
                 :url => Proc.new {|o| {:controller => 'timelog', :action => 'index', :project_id => o.project, :issue_id => o.issue}},
                 :author => :user,
+                :group => :issue,
                 :description => :comments
 
   acts_as_activity_provider :timestamp => "#{table_name}.created_on",
@@ -39,34 +40,32 @@ class TimeEntry < ActiveRecord::Base
   validates_presence_of :user_id, :activity_id, :project_id, :hours, :spent_on
   validates_numericality_of :hours, :allow_nil => true, :message => :invalid
   validates_length_of :comments, :maximum => 255, :allow_nil => true
+  validates :spent_on, :date => true
   before_validation :set_project_if_nil
   validate :validate_time_entry
 
-  scope :visible, lambda {|*args| {
-    :include => :project,
-    :conditions => Project.allowed_to_condition(args.shift || User.current, :view_time_entries, *args)
-  }}
-  scope :on_issue, lambda {|issue| {
-    :include => :issue,
-    :conditions => "#{Issue.table_name}.root_id = #{issue.root_id} AND #{Issue.table_name}.lft >= #{issue.lft} AND #{Issue.table_name}.rgt <= #{issue.rgt}"
-  }}
-  scope :on_project, lambda {|project, include_subprojects| {
-    :include => :project,
-    :conditions => project.project_condition(include_subprojects)
-  }}
+  scope :visible, lambda {|*args|
+    includes(:project).where(Project.allowed_to_condition(args.shift || User.current, :view_time_entries, *args))
+  }
+  scope :on_issue, lambda {|issue|
+    includes(:issue).where("#{Issue.table_name}.root_id = #{issue.root_id} AND #{Issue.table_name}.lft >= #{issue.lft} AND #{Issue.table_name}.rgt <= #{issue.rgt}")
+  }
+  scope :on_project, lambda {|project, include_subprojects|
+    includes(:project).where(project.project_condition(include_subprojects))
+  }
   scope :spent_between, lambda {|from, to|
     if from && to
-     {:conditions => ["#{TimeEntry.table_name}.spent_on BETWEEN ? AND ?", from, to]}
+     where("#{TimeEntry.table_name}.spent_on BETWEEN ? AND ?", from, to)
     elsif from
-     {:conditions => ["#{TimeEntry.table_name}.spent_on >= ?", from]}
+     where("#{TimeEntry.table_name}.spent_on >= ?", from)
     elsif to
-     {:conditions => ["#{TimeEntry.table_name}.spent_on <= ?", to]}
+     where("#{TimeEntry.table_name}.spent_on <= ?", to)
     else
-     {}
+     where(nil)
     end
   }
 
-  safe_attributes 'hours', 'comments', 'issue_id', 'activity_id', 'spent_on', 'custom_field_values', 'custom_fields'
+  safe_attributes 'hours', 'comments', 'project_id', 'issue_id', 'activity_id', 'spent_on', 'custom_field_values', 'custom_fields'
 
   def initialize(attributes=nil, *args)
     super
@@ -76,6 +75,18 @@ class TimeEntry < ActiveRecord::Base
       end
       self.hours = nil if hours == 0
     end
+  end
+
+  def safe_attributes=(attrs, user=User.current)
+    if attrs
+      attrs = super(attrs)
+      if issue_id_changed? && attrs[:project_id].blank? && issue && issue.project_id != project_id
+        if user.allowed_to?(:log_time, issue.project)
+          self.project_id = issue.project_id
+        end
+      end
+    end
+    attrs
   end
 
   def set_project_if_nil
@@ -116,5 +127,15 @@ class TimeEntry < ActiveRecord::Base
   # Returns true if the time entry can be edited by usr, otherwise false
   def editable_by?(usr)
     (usr == user && usr.allowed_to?(:edit_own_time_entries, project)) || usr.allowed_to?(:edit_time_entries, project)
+  end
+
+  # Returns the custom_field_values that can be edited by the given user
+  def editable_custom_field_values(user=nil)
+    visible_custom_field_values
+  end
+
+  # Returns the custom fields that can be edited by the given user
+  def editable_custom_fields(user=nil)
+    editable_custom_field_values(user).map(&:custom_field).uniq
   end
 end

@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -63,6 +63,11 @@ module Redmine
           event_datetime.to_date
         end
 
+        def event_group
+          group = event_options[:group] ? send(event_options[:group]) : self
+          group || self
+        end
+
         def event_url(options = {})
           option = event_options[:url]
           if option.is_a?(Proc)
@@ -76,7 +81,7 @@ module Redmine
           end
         end
 
-        # Returns the mail adresses of users that should be notified
+        # Returns the mail addresses of users that should be notified
         def recipients
           notified = project.notified_users
           notified.reject! {|user| !visible?(user)}

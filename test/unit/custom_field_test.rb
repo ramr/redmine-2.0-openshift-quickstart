@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class CustomFieldTest < ActiveSupport::TestCase
-  fixtures :custom_fields
+  fixtures :custom_fields, :roles, :projects, :issues
 
   def test_create
     field = UserCustomField.new(:name => 'Money money money', :field_format => 'float')
@@ -55,6 +55,26 @@ class CustomFieldTest < ActiveSupport::TestCase
   def test_default_value_should_not_be_validated_when_blank
     field = CustomField.new(:name => 'Test', :field_format => 'list', :possible_values => ['a', 'b'], :is_required => true, :default_value => '')
     assert field.valid?
+  end
+
+  def test_field_format_should_be_validated
+    field = CustomField.new(:name => 'Test', :field_format => 'foo')
+    assert !field.valid?
+  end
+
+  def test_field_format_validation_should_accept_formats_added_at_runtime
+    Redmine::FieldFormat.add 'foobar', Class.new(Redmine::FieldFormat::Base)
+
+    field = CustomField.new(:name => 'Some Custom Field', :field_format => 'foobar')
+    assert field.valid?, 'field should be valid'
+  ensure
+    Redmine::FieldFormat.delete 'foobar'
+  end
+
+  def test_should_not_change_field_format_of_existing_custom_field
+    field = CustomField.find(1)
+    field.field_format = 'int'
+    assert_equal 'list', field.field_format
   end
 
   def test_possible_values_should_accept_an_array
@@ -126,6 +146,7 @@ class CustomFieldTest < ActiveSupport::TestCase
 
     assert f.valid_field_value?(nil)
     assert f.valid_field_value?('')
+    assert !f.valid_field_value?(' ')
     assert f.valid_field_value?('a' * 2)
     assert !f.valid_field_value?('a')
     assert !f.valid_field_value?('a' * 6)
@@ -136,6 +157,7 @@ class CustomFieldTest < ActiveSupport::TestCase
 
     assert f.valid_field_value?(nil)
     assert f.valid_field_value?('')
+    assert !f.valid_field_value?(' ')
     assert f.valid_field_value?('ABC')
     assert !f.valid_field_value?('abc')
   end
@@ -145,6 +167,7 @@ class CustomFieldTest < ActiveSupport::TestCase
 
     assert f.valid_field_value?(nil)
     assert f.valid_field_value?('')
+    assert !f.valid_field_value?(' ')
     assert f.valid_field_value?('1975-07-14')
     assert !f.valid_field_value?('1975-07-33')
     assert !f.valid_field_value?('abc')
@@ -155,6 +178,7 @@ class CustomFieldTest < ActiveSupport::TestCase
 
     assert f.valid_field_value?(nil)
     assert f.valid_field_value?('')
+    assert !f.valid_field_value?(' ')
     assert f.valid_field_value?('value2')
     assert !f.valid_field_value?('abc')
   end
@@ -164,6 +188,7 @@ class CustomFieldTest < ActiveSupport::TestCase
 
     assert f.valid_field_value?(nil)
     assert f.valid_field_value?('')
+    assert !f.valid_field_value?(' ')
     assert f.valid_field_value?('123')
     assert f.valid_field_value?('+123')
     assert f.valid_field_value?('-123')
@@ -175,6 +200,7 @@ class CustomFieldTest < ActiveSupport::TestCase
 
     assert f.valid_field_value?(nil)
     assert f.valid_field_value?('')
+    assert !f.valid_field_value?(' ')
     assert f.valid_field_value?('11.2')
     assert f.valid_field_value?('-6.250')
     assert f.valid_field_value?('5')
@@ -186,9 +212,11 @@ class CustomFieldTest < ActiveSupport::TestCase
 
     assert f.valid_field_value?(nil)
     assert f.valid_field_value?('')
+    assert !f.valid_field_value?(' ')
     assert f.valid_field_value?([])
     assert f.valid_field_value?([nil])
     assert f.valid_field_value?([''])
+    assert !f.valid_field_value?([' '])
 
     assert f.valid_field_value?('value2')
     assert !f.valid_field_value?('abc')
@@ -201,5 +229,90 @@ class CustomFieldTest < ActiveSupport::TestCase
 
     assert f.valid_field_value?(['value1', 'value2'])
     assert !f.valid_field_value?(['value1', 'abc'])
+  end
+
+  def test_changing_multiple_to_false_should_delete_multiple_values
+    field = ProjectCustomField.create!(:name => 'field', :field_format => 'list', :multiple => 'true', :possible_values => ['field1', 'field2'])
+    other = ProjectCustomField.create!(:name => 'other', :field_format => 'list', :multiple => 'true', :possible_values => ['other1', 'other2'])
+
+    item_with_multiple_values = Project.generate!(:custom_field_values => {field.id => ['field1', 'field2'], other.id => ['other1', 'other2']})
+    item_with_single_values = Project.generate!(:custom_field_values => {field.id => ['field1'], other.id => ['other2']})
+
+    assert_difference 'CustomValue.count', -1 do
+      field.multiple = false
+      field.save!
+    end
+
+    item_with_multiple_values = Project.find(item_with_multiple_values.id)
+    assert_kind_of String, item_with_multiple_values.custom_field_value(field)
+    assert_kind_of Array, item_with_multiple_values.custom_field_value(other)
+    assert_equal 2, item_with_multiple_values.custom_field_value(other).size
+  end
+
+  def test_value_class_should_return_the_class_used_for_fields_values
+    assert_equal User, CustomField.new(:field_format => 'user').value_class
+    assert_equal Version, CustomField.new(:field_format => 'version').value_class
+  end
+
+  def test_value_class_should_return_nil_for_other_fields
+    assert_nil CustomField.new(:field_format => 'text').value_class
+    assert_nil CustomField.new.value_class
+  end
+
+  def test_value_from_keyword_for_list_custom_field
+    field = CustomField.find(1)
+    assert_equal 'PostgreSQL', field.value_from_keyword('postgresql', Issue.find(1))
+  end
+
+  def test_visibile_scope_with_admin_should_return_all_custom_fields
+    CustomField.delete_all
+    fields = [
+      CustomField.generate!(:visible => true),
+      CustomField.generate!(:visible => false),
+      CustomField.generate!(:visible => false, :role_ids => [1, 3]),
+      CustomField.generate!(:visible => false, :role_ids => [1, 2]),
+    ]
+
+    assert_equal 4, CustomField.visible(User.find(1)).count
+  end
+
+  def test_visibile_scope_with_non_admin_user_should_return_visible_custom_fields
+    CustomField.delete_all
+    fields = [
+      CustomField.generate!(:visible => true),
+      CustomField.generate!(:visible => false),
+      CustomField.generate!(:visible => false, :role_ids => [1, 3]),
+      CustomField.generate!(:visible => false, :role_ids => [1, 2]),
+    ]
+    user = User.generate!
+    User.add_to_project(user, Project.first, Role.find(3))
+
+    assert_equal [fields[0], fields[2]], CustomField.visible(user).order("id").to_a
+  end
+
+  def test_visibile_scope_with_anonymous_user_should_return_visible_custom_fields
+    CustomField.delete_all
+    fields = [
+      CustomField.generate!(:visible => true),
+      CustomField.generate!(:visible => false),
+      CustomField.generate!(:visible => false, :role_ids => [1, 3]),
+      CustomField.generate!(:visible => false, :role_ids => [1, 2]),
+    ]
+
+    assert_equal [fields[0]], CustomField.visible(User.anonymous).order("id").to_a
+  end
+
+  def test_float_cast_blank_value_should_return_nil
+    field = CustomField.new(:field_format => 'float')
+    assert_equal nil, field.cast_value(nil)
+    assert_equal nil, field.cast_value('')
+  end
+
+  def test_float_cast_valid_value_should_return_float
+    field = CustomField.new(:field_format => 'float')
+    assert_equal 12.0, field.cast_value('12')
+    assert_equal 12.5, field.cast_value('12.5')
+    assert_equal 12.5, field.cast_value('+12.5')
+    assert_equal -12.5, field.cast_value('-12.5')
   end
 end

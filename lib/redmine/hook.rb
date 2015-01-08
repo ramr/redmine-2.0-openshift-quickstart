@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -30,12 +30,12 @@ module Redmine
         clear_listeners_instances
       end
 
-      # Returns all the listerners instances.
+      # Returns all the listener instances.
       def listeners
         @@listeners ||= @@listener_classes.collect {|listener| listener.instance}
       end
 
-      # Returns the listeners instances for the given hook.
+      # Returns the listener instances for the given hook.
       def hook_listeners(hook)
         @@hook_listeners[hook] ||= listeners.select {|listener| listener.respond_to?(hook)}
       end

@@ -10,15 +10,13 @@
   <table class="list">
   <% @queries.each do |query| %>
     <tr class="<%= cycle('odd', 'even') %>">
-      <td>
+      <td class="name">
         <%= link_to h(query.name), :controller => 'issues', :action => 'index', :project_id => @project, :query_id => query %>
       </td>
-      <td align="right">
-        <small>
+      <td class="buttons">
         <% if query.editable_by?(User.current) %>
         <%= link_to l(:button_edit), edit_query_path(query), :class => 'icon icon-edit' %>
-        <%= link_to l(:button_delete), query_path(query), :confirm => l(:text_are_you_sure), :method => :delete, :class => 'icon icon-del' %>
-        </small>
+        <%= delete_link query_path(query) %>
       <% end %>
       </td>
     </tr>

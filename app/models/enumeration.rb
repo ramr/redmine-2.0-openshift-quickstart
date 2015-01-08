@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -24,7 +24,7 @@ class Enumeration < ActiveRecord::Base
 
   acts_as_list :scope => 'type = \'#{type}\''
   acts_as_customizable
-  acts_as_tree :order => 'position ASC'
+  acts_as_tree :order => "#{Enumeration.table_name}.position ASC"
 
   before_destroy :check_integrity
   before_save    :check_default
@@ -35,19 +35,21 @@ class Enumeration < ActiveRecord::Base
   validates_uniqueness_of :name, :scope => [:type, :project_id]
   validates_length_of :name, :maximum => 30
 
-  scope :shared, :conditions => { :project_id => nil }
-  scope :active, :conditions => { :active => true }
-  scope :named, lambda {|arg| { :conditions => ["LOWER(#{table_name}.name) = LOWER(?)", arg.to_s.strip]}}
+  scope :shared, lambda { where(:project_id => nil) }
+  scope :sorted, lambda { order("#{table_name}.position ASC") }
+  scope :active, lambda { where(:active => true) }
+  scope :system, lambda { where(:project_id => nil) }
+  scope :named, lambda {|arg| where("LOWER(#{table_name}.name) = LOWER(?)", arg.to_s.strip)}
 
   def self.default
     # Creates a fake default scope so Enumeration.default will check
     # it's type.  STI subclasses will automatically add their own
     # types to the finder.
     if self.descends_from_active_record?
-      find(:first, :conditions => { :is_default => true, :type => 'Enumeration' })
+      where(:is_default => true, :type => 'Enumeration').first
     else
       # STI classes are
-      find(:first, :conditions => { :is_default => true })
+      where(:is_default => true).first
     end
   end
 
@@ -58,7 +60,7 @@ class Enumeration < ActiveRecord::Base
 
   def check_default
     if is_default? && is_default_changed?
-      Enumeration.update_all("is_default = #{connection.quoted_false}", {:type => type})
+      Enumeration.where({:type => type}).update_all({:is_default => false})
     end
   end
 
@@ -71,7 +73,7 @@ class Enumeration < ActiveRecord::Base
     self.objects_count != 0
   end
 
-  # Is this enumeration overiding a system level enumeration?
+  # Is this enumeration overriding a system level enumeration?
   def is_override?
     !self.parent.nil?
   end
@@ -101,8 +103,14 @@ class Enumeration < ActiveRecord::Base
     subclasses
   end
 
-  # Does the +new+ Hash override the previous Enumeration?
+  # TODO: remove in Redmine 3.0
   def self.overridding_change?(new, previous)
+    ActiveSupport::Deprecation.warn "Enumeration#overridding_change? is deprecated and will be removed in Redmine 3.0. Please use #overriding_change?."
+    overriding_change?(new, previous)
+  end
+
+  # Does the +new+ Hash override the previous Enumeration?
+  def self.overriding_change?(new, previous)
     if (same_active_state?(new['active'], previous.active)) && same_custom_values?(new,previous)
       return false
     else

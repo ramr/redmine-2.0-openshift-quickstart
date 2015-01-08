@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -15,6 +15,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+require 'mime/types'
+
 module Redmine
   module MimeType
 
@@ -26,7 +28,6 @@ module Redmine
       'text/x-c' => 'c,cpp,cc,h,hh',
       'text/x-csharp' => 'cs',
       'text/x-java' => 'java',
-      'text/x-javascript' => 'js',
       'text/x-html-template' => 'rhtml',
       'text/x-perl' => 'pl,pm',
       'text/x-php' => 'php,php3,php4,php5',
@@ -43,24 +44,8 @@ module Redmine
       'image/png' => 'png',
       'image/tiff' => 'tiff,tif',
       'image/x-ms-bmp' => 'bmp',
-      'image/x-xpixmap' => 'xpm',
+      'application/javascript' => 'js',
       'application/pdf' => 'pdf',
-      'application/rtf' => 'rtf',
-      'application/msword' => 'doc',
-      'application/vnd.ms-excel' => 'xls',
-      'application/vnd.ms-powerpoint' => 'ppt,pps',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
-      'application/vnd.openxmlformats-officedocument.presentationml.slideshow' => 'ppsx',
-      'application/vnd.oasis.opendocument.spreadsheet' => 'ods',
-      'application/vnd.oasis.opendocument.text' => 'odt',
-      'application/vnd.oasis.opendocument.presentation' => 'odp',
-      'application/x-7z-compressed' => '7z',
-      'application/x-rar-compressed' => 'rar',
-      'application/x-tar' => 'tar',
-      'application/zip' => 'zip',
-      'application/x-gzip' => 'gz',
     }.freeze
 
     EXTENSIONS = MIME_TYPES.inject({}) do |map, (type, exts)|
@@ -70,9 +55,16 @@ module Redmine
 
     # returns mime type for name or nil if unknown
     def self.of(name)
-      return nil unless name
-      m = name.to_s.match(/(^|\.)([^\.]+)$/)
-      EXTENSIONS[m[2].downcase] if m
+      return nil unless name.present?
+      if m = name.to_s.match(/(^|\.)([^\.]+)$/)
+        extension = m[2].downcase
+        @known_types ||= Hash.new do |h, ext|
+          type = EXTENSIONS[ext]
+          type ||= MIME::Types.type_for(ext).first.to_s.presence
+          h[ext] = type
+        end
+        @known_types[extension]
+      end
     end
 
     # Returns the css class associated to

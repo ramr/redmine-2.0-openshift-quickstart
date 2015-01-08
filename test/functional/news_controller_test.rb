@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,18 +16,13 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 require File.expand_path('../../test_helper', __FILE__)
-require 'news_controller'
-
-# Re-raise errors caught by the controller.
-class NewsController; def rescue_action(e) raise e end; end
 
 class NewsControllerTest < ActionController::TestCase
-  fixtures :projects, :users, :roles, :members, :member_roles, :enabled_modules, :news, :comments
+  fixtures :projects, :users, :roles, :members, :member_roles,
+           :enabled_modules, :news, :comments,
+           :attachments
 
   def setup
-    @controller = NewsController.new
-    @request    = ActionController::TestRequest.new
-    @response   = ActionController::TestResponse.new
     User.current = nil
   end
 
@@ -82,12 +77,13 @@ class NewsControllerTest < ActionController::TestCase
 
   def test_post_create
     ActionMailer::Base.deliveries.clear
-    Setting.notified_events << 'news_added'
-
     @request.session[:user_id] = 2
-    post :create, :project_id => 1, :news => { :title => 'NewsControllerTest',
+
+    with_settings :notified_events => %w(news_added) do
+      post :create, :project_id => 1, :news => { :title => 'NewsControllerTest',
                                             :description => 'This is the description',
                                             :summary => '' }
+    end
     assert_redirected_to '/projects/ecookbook/news'
 
     news = News.find_by_title('NewsControllerTest')
@@ -108,8 +104,8 @@ class NewsControllerTest < ActionController::TestCase
           :attachments => {'1' => {'file' => uploaded_test_file('testfile.txt', 'text/plain')}}
       end
     end
-    attachment = Attachment.first(:order => 'id DESC')
-    news = News.first(:order => 'id DESC')
+    attachment = Attachment.order('id DESC').first
+    news = News.order('id DESC').first
     assert_equal news, attachment.container
   end
 
@@ -122,7 +118,7 @@ class NewsControllerTest < ActionController::TestCase
     assert_template 'new'
     assert_not_nil assigns(:news)
     assert assigns(:news).new_record?
-    assert_error_tag :content => /title can't be blank/i
+    assert_error_tag :content => /title #{ESCAPED_CANT} be blank/i
   end
 
   def test_get_edit
@@ -150,7 +146,7 @@ class NewsControllerTest < ActionController::TestCase
           :attachments => {'1' => {'file' => uploaded_test_file('testfile.txt', 'text/plain')}}
       end
     end
-    attachment = Attachment.first(:order => 'id DESC')
+    attachment = Attachment.order('id DESC').first
     assert_equal News.find(1), attachment.container
   end
 
@@ -159,7 +155,7 @@ class NewsControllerTest < ActionController::TestCase
     put :update, :id => 1, :news => { :description => '' }
     assert_response :success
     assert_template 'edit'
-    assert_error_tag :content => /description can't be blank/i
+    assert_error_tag :content => /description #{ESCAPED_CANT} be blank/i
   end
 
   def test_destroy

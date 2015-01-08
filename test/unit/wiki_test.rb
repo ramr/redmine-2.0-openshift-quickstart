@@ -1,7 +1,7 @@
 # encoding: utf-8
 #
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -23,7 +23,7 @@ class WikiTest < ActiveSupport::TestCase
   fixtures :projects, :wikis, :wiki_pages, :wiki_contents, :wiki_content_versions
 
   def test_create
-    wiki = Wiki.new(:project => Project.find(2))
+    wiki = Wiki.new(:project => Project.find(3))
     assert !wiki.save
     assert_equal 1, wiki.errors.count
 
@@ -84,22 +84,18 @@ class WikiTest < ActiveSupport::TestCase
     assert_equal ja_test, Wiki.titleize(ja_test)
   end
 
-  context "#sidebar" do
-    setup do
-      @wiki = Wiki.find(1)
-    end
+  def test_sidebar_should_return_nil_if_undefined
+    @wiki = Wiki.find(1)
+    assert_nil @wiki.sidebar
+  end
 
-    should "return nil if undefined" do
-      assert_nil @wiki.sidebar
-    end
+  def test_sidebar_should_return_a_wiki_page_if_defined
+    @wiki = Wiki.find(1)
+    page = @wiki.pages.new(:title => 'Sidebar')
+    page.content = WikiContent.new(:text => 'Side bar content for test_show_with_sidebar')
+    page.save!
 
-    should "return a WikiPage if defined" do
-      page = @wiki.pages.new(:title => 'Sidebar')
-      page.content = WikiContent.new(:text => 'Side bar content for test_show_with_sidebar')
-      page.save!
-
-      assert_kind_of WikiPage, @wiki.sidebar
-      assert_equal 'Sidebar', @wiki.sidebar.title
-    end
+    assert_kind_of WikiPage, @wiki.sidebar
+    assert_equal 'Sidebar', @wiki.sidebar.title
   end
 end

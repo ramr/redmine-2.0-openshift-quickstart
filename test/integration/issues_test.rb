@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -22,6 +22,7 @@ class IssuesTest < ActionController::IntegrationTest
            :users,
            :roles,
            :members,
+           :member_roles,
            :trackers,
            :projects_trackers,
            :enabled_modules,
@@ -64,13 +65,25 @@ class IssuesTest < ActionController::IntegrationTest
     assert_equal 1, issue.status.id
   end
 
-  def test_update_issue_form
-    log_user('jsmith', 'jsmith')
-    post 'projects/ecookbook/issues/new', :issue => { :tracker_id => "2"}
-    assert_response :success
-    assert_tag 'select',
-      :attributes => {:name => 'issue[tracker_id]'},
-      :child => {:tag => 'option', :attributes => {:value => '2', :selected => 'selected'}}
+  def test_create_issue_by_anonymous_without_permission_should_fail
+    Role.anonymous.remove_permission! :add_issues
+
+    assert_no_difference 'Issue.count' do
+      post 'projects/1/issues', :tracker_id => "1", :issue => {:subject => "new test issue"}
+    end
+    assert_response 302
+  end
+
+  def test_create_issue_by_anonymous_with_custom_permission_should_succeed
+    Role.anonymous.remove_permission! :add_issues
+    Member.create!(:project_id => 1, :principal => Group.anonymous, :role_ids => [3])
+
+    assert_difference 'Issue.count' do
+      post 'projects/1/issues', :tracker_id => "1", :issue => {:subject => "new test issue"}
+    end
+    assert_response 302
+    issue = Issue.order("id DESC").first
+    assert_equal User.anonymous, issue.author
   end
 
   # add then remove 2 attachments to an issue
@@ -164,7 +177,7 @@ class IssuesTest < ActionController::IntegrationTest
           :custom_field_values => {@field.id.to_s => users.first.id.to_s}
         }
     end
-    issue = Issue.first(:order => 'id DESC')
+    issue = Issue.order('id DESC').first
     assert_response 302
 
     # Issue view

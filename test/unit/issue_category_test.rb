@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class IssueCategoryTest < ActiveSupport::TestCase
-  fixtures :issue_categories, :issues
+  fixtures :issue_categories, :issues, :users, :groups_users
 
   def setup
     @category = IssueCategory.find(1)
@@ -26,13 +26,13 @@ class IssueCategoryTest < ActiveSupport::TestCase
 
   def test_create
     assert IssueCategory.new(:project_id => 2, :name => 'New category').save
-    category = IssueCategory.first(:order => 'id DESC')
+    category = IssueCategory.order('id DESC').first
     assert_equal 'New category', category.name
   end
 
   def test_create_with_group_assignment
     assert IssueCategory.new(:project_id => 2, :name => 'Group assignment', :assigned_to_id => 11).save
-    category = IssueCategory.first(:order => 'id DESC')
+    category = IssueCategory.order('id DESC').first
     assert_kind_of Group, category.assigned_to
     assert_equal Group.find(11), category.assigned_to
   end

@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,20 +16,13 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 require File.expand_path('../../test_helper', __FILE__)
-require 'my_controller'
-
-# Re-raise errors caught by the controller.
-class MyController; def rescue_action(e) raise e end; end
 
 class MyControllerTest < ActionController::TestCase
   fixtures :users, :user_preferences, :roles, :projects, :members, :member_roles,
   :issues, :issue_statuses, :trackers, :enumerations, :custom_fields, :auth_sources
 
   def setup
-    @controller = MyController.new
-    @request    = ActionController::TestRequest.new
     @request.session[:user_id] = 2
-    @response   = ActionController::TestResponse.new
   end
 
   def test_index
@@ -58,6 +51,17 @@ class MyControllerTest < ActionController::TestCase
     end
   end
 
+  def test_page_with_all_blocks
+    blocks = MyController::BLOCKS.keys
+    preferences = User.find(2).pref
+    preferences[:my_page_layout] = {'top' => blocks}
+    preferences.save!
+
+    get :page
+    assert_response :success
+    assert_select 'div.mypage-box', blocks.size
+  end
+
   def test_my_account_should_show_editable_custom_fields
     get :account
     assert_response :success
@@ -76,6 +80,20 @@ class MyControllerTest < ActionController::TestCase
     assert_equal User.find(2), assigns(:user)
 
     assert_no_tag :input, :attributes => { :name => 'user[custom_field_values][4]'}
+  end
+
+  def test_my_account_should_show_language_select
+    get :account
+    assert_response :success
+    assert_select 'select[name=?]', 'user[language]'
+  end
+
+  def test_my_account_should_not_show_language_select_with_force_default_language_for_loggedin
+    with_settings :force_default_language_for_loggedin => '1' do
+      get :account
+      assert_response :success
+      assert_select 'select[name=?]', 'user[language]', 0
+    end
   end
 
   def test_update_account
@@ -145,26 +163,38 @@ class MyControllerTest < ActionController::TestCase
 
     # non matching password confirmation
     post :password, :password => 'jsmith',
-                    :new_password => 'hello',
-                    :new_password_confirmation => 'hello2'
+                    :new_password => 'secret123',
+                    :new_password_confirmation => 'secret1234'
     assert_response :success
     assert_template 'password'
-    assert_error_tag :content => /Password doesn't match confirmation/
+    assert_error_tag :content => /Password doesn&#x27;t match confirmation/
 
     # wrong password
     post :password, :password => 'wrongpassword',
-                    :new_password => 'hello',
-                    :new_password_confirmation => 'hello'
+                    :new_password => 'secret123',
+                    :new_password_confirmation => 'secret123'
     assert_response :success
     assert_template 'password'
     assert_equal 'Wrong password', flash[:error]
 
     # good password
     post :password, :password => 'jsmith',
-                    :new_password => 'hello',
-                    :new_password_confirmation => 'hello'
+                    :new_password => 'secret123',
+                    :new_password_confirmation => 'secret123'
     assert_redirected_to '/my/account'
-    assert User.try_to_login('jsmith', 'hello')
+    assert User.try_to_login('jsmith', 'secret123')
+  end
+
+  def test_change_password_kills_other_sessions
+    @request.session[:ctime] = (Time.now - 30.minutes).utc.to_i
+
+    jsmith = User.find(2)
+    jsmith.passwd_changed_on = Time.now
+    jsmith.save!
+
+    get 'account'
+    assert_response 302
+    assert flash[:error].match(/Your session has expired/)
   end
 
   def test_change_password_should_redirect_if_user_cannot_change_its_password
@@ -182,19 +212,24 @@ class MyControllerTest < ActionController::TestCase
   end
 
   def test_add_block
-    xhr :post, :add_block, :block => 'issuesreportedbyme'
-    assert_response :success
+    post :add_block, :block => 'issuesreportedbyme'
+    assert_redirected_to '/my/page_layout'
     assert User.find(2).pref[:my_page_layout]['top'].include?('issuesreportedbyme')
   end
 
+  def test_add_invalid_block_should_redirect
+    post :add_block, :block => 'invalid'
+    assert_redirected_to '/my/page_layout'
+  end
+
   def test_remove_block
-    xhr :post, :remove_block, :block => 'issuesassignedtome'
-    assert_response :success
+    post :remove_block, :block => 'issuesassignedtome'
+    assert_redirected_to '/my/page_layout'
     assert !User.find(2).pref[:my_page_layout].values.flatten.include?('issuesassignedtome')
   end
 
   def test_order_blocks
-    xhr :post, :order_blocks, :group => 'left', 'list-left' => ['documents', 'calendar', 'latestnews']
+    xhr :post, :order_blocks, :group => 'left', 'blocks' => ['documents', 'calendar', 'latestnews']
     assert_response :success
     assert_equal ['documents', 'calendar', 'latestnews'], User.find(2).pref[:my_page_layout]['left']
   end

@@ -1,7 +1,7 @@
 # encoding: utf-8
 #
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,20 +19,11 @@
 
 module UsersHelper
   def users_status_options_for_select(selected)
-    user_count_by_status = User.count(:group => 'status').to_hash
+    user_count_by_status = User.group('status').count.to_hash
     options_for_select([[l(:label_all), ''],
                         ["#{l(:status_active)} (#{user_count_by_status[1].to_i})", '1'],
                         ["#{l(:status_registered)} (#{user_count_by_status[2].to_i})", '2'],
                         ["#{l(:status_locked)} (#{user_count_by_status[3].to_i})", '3']], selected.to_s)
-  end
-
-  # Options for the new membership projects combo-box
-  def options_for_membership_project_select(user, projects)
-    options = content_tag('option', "--- #{l(:actionview_instancetag_blank_option)} ---")
-    options << project_tree_options_for_select(projects) do |p|
-      {:disabled => (user.projects.include?(p))}
-    end
-    options
   end
 
   def user_mail_notification_options(user)
@@ -55,7 +46,7 @@ module UsersHelper
     tabs = [{:name => 'general', :partial => 'users/general', :label => :label_general},
             {:name => 'memberships', :partial => 'users/memberships', :label => :label_project_plural}
             ]
-    if Group.all.any?
+    if Group.givable.any?
       tabs.insert 1, {:name => 'groups', :partial => 'users/groups', :label => :label_group_plural}
     end
     tabs

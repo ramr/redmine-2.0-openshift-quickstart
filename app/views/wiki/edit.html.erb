@@ -22,7 +22,8 @@
       <label><%= l(:field_parent_title) %></label>
       <%= fp.select :parent_id,
                     content_tag('option', '', :value => '') +
-                       wiki_page_options_for_select(@wiki.pages.all(:include => :parent) -
+                       wiki_page_options_for_select(
+                         @wiki.pages.includes(:parent).all -
                          @page.self_and_descendants, @page.parent) %>
     </p>
   <% end %>
@@ -33,21 +34,13 @@
 </div>
 
 <p><%= submit_tag l(:button_save) %>
-   <%= link_to_remote l(:label_preview),
-                       { :url => { :controller => 'wiki', :action => 'preview',
-                                   :project_id => @project, :id => @page.title },
-                         :method => :post,
-                         :update => 'preview',
-                         :with => "Form.serialize('wiki_form')",
-                         :complete => "Element.scrollTo('preview')"
-                       }, :accesskey => accesskey(:preview) %></p>
+   <%= preview_link({:controller => 'wiki', :action => 'preview', :project_id => @project, :id => @page.title }, 'wiki_form') %></p>
 <%= wikitoolbar_for 'content_text' %>
 <% end %>
 
 <div id="preview" class="wiki"></div>
 
 <% content_for :header_tags do %>
-  <%= stylesheet_link_tag 'scm' %>
   <%= robot_exclusion_tag %>
 <% end %>
 

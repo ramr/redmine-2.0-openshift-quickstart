@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,34 +19,71 @@ class CustomField < ActiveRecord::Base
   include Redmine::SubclassFactory
 
   has_many :custom_values, :dependent => :delete_all
+  has_and_belongs_to_many :roles, :join_table => "#{table_name_prefix}custom_fields_roles#{table_name_suffix}", :foreign_key => "custom_field_id"
   acts_as_list :scope => 'type = \'#{self.class}\''
   serialize :possible_values
+  store :format_store
 
   validates_presence_of :name, :field_format
   validates_uniqueness_of :name, :scope => :type
   validates_length_of :name, :maximum => 30
-  validates_inclusion_of :field_format, :in => Redmine::CustomFieldFormat.available_formats
-
+  validates_inclusion_of :field_format, :in => Proc.new { Redmine::FieldFormat.available_formats }
   validate :validate_custom_field
-  before_validation :set_searchable
 
-  def initialize(attributes=nil, *args)
-    super
-    self.possible_values ||= []
+  before_validation :set_searchable
+  before_save do |field|
+    field.format.before_custom_field_save(field)
+  end
+  after_save :handle_multiplicity_change
+  after_save do |field|
+    if field.visible_changed? && field.visible
+      field.roles.clear
+    end
+  end
+
+  scope :sorted, lambda { order("#{table_name}.position ASC") }
+  scope :visible, lambda {|*args|
+    user = args.shift || User.current
+    if user.admin?
+      # nop
+    elsif user.memberships.any?
+      where("#{table_name}.visible = ? OR #{table_name}.id IN (SELECT DISTINCT cfr.custom_field_id FROM #{Member.table_name} m" +
+        " INNER JOIN #{MemberRole.table_name} mr ON mr.member_id = m.id" +
+        " INNER JOIN #{table_name_prefix}custom_fields_roles#{table_name_suffix} cfr ON cfr.role_id = mr.role_id" +
+        " WHERE m.user_id = ?)",
+        true, user.id)
+    else
+      where(:visible => true)
+    end
+  }
+
+  def visible_by?(project, user=User.current)
+    visible? || user.admin?
+  end
+
+  def format
+    @format ||= Redmine::FieldFormat.find(field_format)
+  end
+
+  def field_format=(arg)
+    # cannot change format of a saved custom field
+    if new_record?
+      @format = nil
+      super
+    end
   end
 
   def set_searchable
     # make sure these fields are not searchable
-    self.searchable = false if %w(int float date bool).include?(field_format)
+    self.searchable = false unless format.class.searchable_supported
     # make sure only these fields can have multiple values
-    self.multiple = false unless %w(list user version).include?(field_format)
+    self.multiple = false unless format.class.multiple_supported
     true
   end
 
   def validate_custom_field
-    if self.field_format == "list"
-      errors.add(:possible_values, :blank) if self.possible_values.nil? || self.possible_values.empty?
-      errors.add(:possible_values, :invalid) unless self.possible_values.is_a? Array
+    format.validate_custom_field(self).each do |attribute, message|
+      errors.add attribute, message
     end
 
     if regexp.present?
@@ -57,102 +94,111 @@ class CustomField < ActiveRecord::Base
       end
     end
 
-    if default_value.present? && !valid_field_value?(default_value)
-      errors.add(:default_value, :invalid)
-    end
-  end
-
-  def possible_values_options(obj=nil)
-    case field_format
-    when 'user', 'version'
-      if obj.respond_to?(:project) && obj.project
-        case field_format
-        when 'user'
-          obj.project.users.sort.collect {|u| [u.to_s, u.id.to_s]}
-        when 'version'
-          obj.project.shared_versions.sort.collect {|u| [u.to_s, u.id.to_s]}
-        end
-      elsif obj.is_a?(Array)
-        obj.collect {|o| possible_values_options(o)}.reduce(:&)
-      else
-        []
+    if default_value.present?
+      validate_field_value(default_value).each do |message|
+        errors.add :default_value, message
       end
-    when 'bool'
-      [[l(:general_text_Yes), '1'], [l(:general_text_No), '0']]
-    else
-      possible_values || []
     end
   end
 
-  def possible_values(obj=nil)
-    case field_format
-    when 'user', 'version'
-      possible_values_options(obj).collect(&:last)
-    when 'bool'
-      ['1', '0']
+  def possible_custom_value_options(custom_value)
+    format.possible_custom_value_options(custom_value)
+  end
+
+  def possible_values_options(object=nil)
+    if object.is_a?(Array)
+      object.map {|o| format.possible_values_options(self, o)}.reduce(:&) || []
     else
-      values = super()
-      if values.is_a?(Array)
-        values.each do |value|
-          value.force_encoding('UTF-8') if value.respond_to?(:force_encoding)
-        end
+      format.possible_values_options(self, object) || []
+    end
+  end
+
+  def possible_values
+    values = read_attribute(:possible_values)
+    if values.is_a?(Array)
+      values.each do |value|
+        value.force_encoding('UTF-8') if value.respond_to?(:force_encoding)
       end
       values
+    else
+      []
     end
   end
 
   # Makes possible_values accept a multiline string
   def possible_values=(arg)
     if arg.is_a?(Array)
-      super(arg.compact.collect(&:strip).select {|v| !v.blank?})
+      values = arg.compact.collect(&:strip).select {|v| !v.blank?}
+      write_attribute(:possible_values, values)
     else
       self.possible_values = arg.to_s.split(/[\n\r]+/)
     end
   end
 
   def cast_value(value)
-    casted = nil
-    unless value.blank?
-      case field_format
-      when 'string', 'text', 'list'
-        casted = value
-      when 'date'
-        casted = begin; value.to_date; rescue; nil end
-      when 'bool'
-        casted = (value == '1' ? true : false)
-      when 'int'
-        casted = value.to_i
-      when 'float'
-        casted = value.to_f
-      when 'user', 'version'
-        casted = (value.blank? ? nil : field_format.classify.constantize.find_by_id(value.to_i))
+    format.cast_value(self, value)
+  end
+
+  def value_from_keyword(keyword, customized)
+    possible_values_options = possible_values_options(customized)
+    if possible_values_options.present?
+      keyword = keyword.to_s.downcase
+      if v = possible_values_options.detect {|text, id| text.downcase == keyword}
+        if v.is_a?(Array)
+          v.last
+        else
+          v
+        end
       end
+    else
+      keyword
     end
-    casted
   end
 
   # Returns a ORDER BY clause that can used to sort customized
   # objects by their value of the custom field.
-  # Returns false, if the custom field can not be used for sorting.
+  # Returns nil if the custom field can not be used for sorting.
   def order_statement
     return nil if multiple?
-    case field_format
-      when 'string', 'text', 'list', 'date', 'bool'
-        # COALESCE is here to make sure that blank and NULL values are sorted equally
-        "COALESCE((SELECT cv_sort.value FROM #{CustomValue.table_name} cv_sort" +
-          " WHERE cv_sort.customized_type='#{self.class.customized_class.name}'" +
-          " AND cv_sort.customized_id=#{self.class.customized_class.table_name}.id" +
-          " AND cv_sort.custom_field_id=#{id} LIMIT 1), '')"
-      when 'int', 'float'
-        # Make the database cast values into numeric
-        # Postgresql will raise an error if a value can not be casted!
-        # CustomValue validations should ensure that it doesn't occur
-        "(SELECT CAST(cv_sort.value AS decimal(60,3)) FROM #{CustomValue.table_name} cv_sort" +
-          " WHERE cv_sort.customized_type='#{self.class.customized_class.name}'" +
-          " AND cv_sort.customized_id=#{self.class.customized_class.table_name}.id" +
-          " AND cv_sort.custom_field_id=#{id} AND cv_sort.value <> '' AND cv_sort.value IS NOT NULL LIMIT 1)"
-      else
-        nil
+    format.order_statement(self)
+  end
+
+  # Returns a GROUP BY clause that can used to group by custom value
+  # Returns nil if the custom field can not be used for grouping.
+  def group_statement
+    return nil if multiple?
+    format.group_statement(self)
+  end
+
+  def join_for_order_statement
+    format.join_for_order_statement(self)
+  end
+
+  def visibility_by_project_condition(project_key=nil, user=User.current, id_column=nil)
+    if visible? || user.admin?
+      "1=1"
+    elsif user.anonymous?
+      "1=0"
+    else
+      project_key ||= "#{self.class.customized_class.table_name}.project_id"
+      id_column ||= id
+      "#{project_key} IN (SELECT DISTINCT m.project_id FROM #{Member.table_name} m" +
+        " INNER JOIN #{MemberRole.table_name} mr ON mr.member_id = m.id" +
+        " INNER JOIN #{table_name_prefix}custom_fields_roles#{table_name_suffix} cfr ON cfr.role_id = mr.role_id" +
+        " WHERE m.user_id = #{user.id} AND cfr.custom_field_id = #{id_column})"
+    end
+  end
+
+  def self.visibility_condition
+    if user.admin?
+      "1=1"
+    elsif user.anonymous?
+      "#{table_name}.visible"
+    else
+      "#{project_key} IN (SELECT DISTINCT m.project_id FROM #{Member.table_name} m" +
+        " INNER JOIN #{MemberRole.table_name} mr ON mr.member_id = m.id" +
+        " INNER JOIN #{table_name_prefix}custom_fields_roles#{table_name_suffix} cfr ON cfr.role_id = mr.role_id" +
+        " WHERE m.user_id = #{user.id} AND cfr.custom_field_id = #{id})"
     end
   end
 
@@ -160,14 +206,19 @@ class CustomField < ActiveRecord::Base
     position <=> field.position
   end
 
+  # Returns the class that values represent
+  def value_class
+    format.target_class if format.respond_to?(:target_class)
+  end
+
   def self.customized_class
     self.name =~ /^(.+)CustomField$/
-    begin; $1.constantize; rescue nil; end
+    $1.constantize rescue nil
   end
 
   # to move in project_custom_field
   def self.for_all
-    find(:all, :conditions => ["is_for_all=?", true], :order => 'position')
+    where(:is_for_all => true).order('position').all
   end
 
   def type_name
@@ -176,7 +227,8 @@ class CustomField < ActiveRecord::Base
 
   # Returns the error messages for the given value
   # or an empty array if value is a valid value for the custom field
-  def validate_field_value(value)
+  def validate_custom_value(custom_value)
+    value = custom_value.value
     errs = []
     if value.is_a?(Array)
       if !multiple?
@@ -185,14 +237,18 @@ class CustomField < ActiveRecord::Base
       if is_required? && value.detect(&:present?).nil?
         errs << ::I18n.t('activerecord.errors.messages.blank')
       end
-      value.each {|v| errs += validate_field_value_format(v)}
     else
       if is_required? && value.blank?
         errs << ::I18n.t('activerecord.errors.messages.blank')
       end
-      errs += validate_field_value_format(value)
     end
+    errs += format.validate_custom_value(custom_value)
     errs
+  end
+
+  # Returns the error messages for the default custom field value
+  def validate_field_value(value)
+    validate_custom_value(CustomValue.new(:custom_field => self, :value => value))
   end
 
   # Returns true if value is a valid value for the custom field
@@ -200,28 +256,27 @@ class CustomField < ActiveRecord::Base
     validate_field_value(value).empty?
   end
 
+  def format_in?(*args)
+    args.include?(field_format)
+  end
+
   protected
 
-  # Returns the error message for the given value regarding its format
-  def validate_field_value_format(value)
-    errs = []
-    if value.present?
-      errs << ::I18n.t('activerecord.errors.messages.invalid') unless regexp.blank? or value =~ Regexp.new(regexp)
-      errs << ::I18n.t('activerecord.errors.messages.too_short', :count => min_length) if min_length > 0 and value.length < min_length
-      errs << ::I18n.t('activerecord.errors.messages.too_long', :count => max_length) if max_length > 0 and value.length > max_length
+  # Removes multiple values for the custom field after setting the multiple attribute to false
+  # We kepp the value with the highest id for each customized object
+  def handle_multiplicity_change
+    if !new_record? && multiple_was && !multiple
+      ids = custom_values.
+        where("EXISTS(SELECT 1 FROM #{CustomValue.table_name} cve WHERE cve.custom_field_id = #{CustomValue.table_name}.custom_field_id" +
+          " AND cve.customized_type = #{CustomValue.table_name}.customized_type AND cve.customized_id = #{CustomValue.table_name}.customized_id" +
+          " AND cve.id > #{CustomValue.table_name}.id)").
+        pluck(:id)
 
-      # Format specific validations
-      case field_format
-      when 'int'
-        errs << ::I18n.t('activerecord.errors.messages.not_a_number') unless value =~ /^[+-]?\d+$/
-      when 'float'
-        begin; Kernel.Float(value); rescue; errs << ::I18n.t('activerecord.errors.messages.invalid') end
-      when 'date'
-        errs << ::I18n.t('activerecord.errors.messages.not_a_date') unless value =~ /^\d{4}-\d{2}-\d{2}$/ && begin; value.to_date; rescue; false end
-      when 'list'
-        errs << ::I18n.t('activerecord.errors.messages.inclusion') unless possible_values.include?(value)
+      if ids.any?
+        custom_values.where(:id => ids).delete_all
       end
     end
-    errs
   end
 end
+
+require_dependency 'redmine/field_format'

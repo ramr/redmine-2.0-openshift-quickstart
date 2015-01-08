@@ -1,5 +1,5 @@
 <% roles = Role.find_all_givable %>
-<% projects = Project.active.find(:all, :order => 'lft') %>
+<% projects = Project.active.all %>
 
 <div class="splitcontentleft">
 <% if @user.memberships.any? %>
@@ -25,26 +25,22 @@
                            :style => 'display:none;'}) do %>
         <p><% roles.each do |role| %>
         <label><%= check_box_tag 'membership[role_ids][]', role.id, membership.roles.include?(role),
-                                                           :disabled => membership.member_roles.detect {|mr| mr.role_id == role.id && !mr.inherited_from.nil?} %> <%=h role %></label><br />
+                                                           :disabled => membership.member_roles.detect {|mr| mr.role_id == role.id && !mr.inherited_from.nil?},
+                                                           :id => nil %> <%=h role %></label><br />
         <% end %></p>
         <%= hidden_field_tag 'membership[role_ids][]', '' %>
         <p><%= submit_tag l(:button_change) %>
         <%= link_to_function l(:button_cancel),
-                             "$('member-#{membership.id}-roles').show(); $('member-#{membership.id}-roles-form').hide(); return false;"
+                             "$('#member-#{membership.id}-roles').show(); $('#member-#{membership.id}-roles-form').hide(); return false;"
             %></p>
     <% end %>
   </td>
   <td class="buttons">
       <%= link_to_function l(:button_edit),
-                           "$('member-#{membership.id}-roles').hide(); $('member-#{membership.id}-roles-form').show(); return false;",
+                           "$('#member-#{membership.id}-roles').hide(); $('#member-#{membership.id}-roles-form').show(); return false;",
                            :class => 'icon icon-edit'
           %>
-      <%= link_to_remote(
-            l(:button_delete),
-            { :url => user_membership_path(@user, membership),
-              :method => :delete },
-            :class => 'icon icon-del'
-          ) if membership.deletable? %>
+      <%= delete_link user_membership_path(@user, membership), :remote => true if membership.deletable? %>
   </td>
       <%= call_hook(:view_users_memberships_table_row, :user => @user, :membership => membership, :roles => roles, :projects => projects )%>
   </tr>
@@ -63,7 +59,7 @@
 <%= select_tag 'membership[project_id]', options_for_membership_project_select(@user, projects) %>
 <p><%= l(:label_role_plural) %>:
 <% roles.each do |role| %>
-  <label><%= check_box_tag 'membership[role_ids][]', role.id %> <%=h role %></label>
+  <label><%= check_box_tag 'membership[role_ids][]', role.id, false, :id => nil %> <%=h role %></label>
 <% end %></p>
 <p><%= submit_tag l(:button_add) %></p>
 <% end %>
