@@ -6,6 +6,12 @@
 
 
 function get_ruby_version() {
+  #  Use OPENSHIFT_RUBY_IDENT if we have it.
+  if [ -n "$OPENSHIFT_RUBY_IDENT" ]; then
+    echo "$OPENSHIFT_RUBY_IDENT" | sed "s/[^:]*:ruby:\([^:]*\):.*/ruby-\1/"
+    return 0
+  fi
+
   #  Use GEAR_TYPE if we have it.
   [ -n "$OPENSHIFT_GEAR_TYPE" ]  &&  echo "$OPENSHIFT_GEAR_TYPE"  &&  return 0
 
@@ -16,20 +22,21 @@ function get_ruby_version() {
   fi
 
   echo "ruby-1.8"
-}
+
+}  #  End of function  get_ruby_version.
 
 
 #
 #  main(): Add a Gemfile.lock from the specific version and replace the env
 #          variables for DB HOST, USERNAME and PASSWORD.
-# 
+#
 pushd "$OPENSHIFT_REPO_DIR" > /dev/null
 [ ! -f Gemfile.lock ] && cp -f "Gemfile.lock.$(get_ruby_version)" Gemfile.lock
 
 if [ -f config/database.yml ]; then
-   sed -i "s#\$OPENSHIFT_DB_HOST#$OPENSHIFT_DB_HOST#;          \
-           s#\$OPENSHIFT_DB_USERNAME#$OPENSHIFT_DB_USERNAME#;  \
-           s#\$OPENSHIFT_DB_PASSWORD#$OPENSHIFT_DB_PASSWORD#"  \
+   sed -i "s#\$OPENSHIFT_MYSQL_DB_HOST#$OPENSHIFT_MYSQL_DB_HOST#;          \
+           s#\$OPENSHIFT_MYSQL_DB_USERNAME#$OPENSHIFT_MYSQL_DB_USERNAME#;  \
+           s#\$OPENSHIFT_MYSQL_DB_PASSWORD#$OPENSHIFT_MYSQL_DB_PASSWORD#"  \
           config/database.yml
 fi
 popd > /dev/null
