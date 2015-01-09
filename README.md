@@ -11,13 +11,15 @@ Running on OpenShift
 
 Create an account at http://openshift.redhat.com/
 
-Create a ruby application (ruby-1.9 or ruby-1.8)
+Create a ruby 1.9 application
+**Ruby 1.8 is no longer supported**
+**Ruby 2.0 support is pending (coredumps on OpenShift)**
 
-	rhc app create -a redmine -t ruby-1.9  # or ruby-1.8
+	rhc app create -a redmine -t ruby-1.9
 
 Add mysql support to your application
     
-	rhc app cartridge add -a redmine -c mysql-5.5  #  or mysql-5.1
+	rhc cartridge-add -a redmine -c mysql-5.5  #  or mysql-5.1
 
 Make a note of the username, password, and host name as you will need to use these to login to the mysql database
 
