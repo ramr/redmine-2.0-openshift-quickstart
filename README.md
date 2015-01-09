@@ -12,8 +12,9 @@ Running on OpenShift
 Create an account at http://openshift.redhat.com/
 
 Create a ruby 1.9 application
-**Ruby 1.8 is no longer supported**
-**Ruby 2.0 support is pending (coredumps on OpenShift)**
+
+**Ruby 1.8 is no longer supported**     
+**Ruby 2.0 support is pending (coredumps on OpenShift)**    
 
 	rhc app create -a redmine -t ruby-1.9
 
